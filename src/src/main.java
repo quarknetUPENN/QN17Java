@@ -1,5 +1,9 @@
 import com.pi4j.io.gpio.*;
 
+import static com.pi4j.io.gpio.PinState.LOW;
+import static com.pi4j.io.gpio.PinState.HIGH;
+
+
 /**
  * Created by Jonathan on 7/5/2017.
  */
@@ -10,11 +14,55 @@ public class main {
     final static GpioController gpioController = GpioFactory.getInstance();
 
     public static void main(String[] args) {
+
+
+        FpgaPin.ENABLE.setState(HIGH);
+
+        Thread thread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+
+                while(!Thread.interrupted())
+                {
+                    if (FpgaPin.EMPTY.getState() == LOW) {
+                        Log.i(TAG, "No data to get; terminating read thread");
+                        return;
+                    }
+
+                    FpgaPin.CLOCK.setState(HIGH);
+                    try {
+                        Thread.sleep(1);
+                    } catch (InterruptedException e) {
+                        Log.e(TAG, "Reading thread interrupted while waiting; terminating read thread", e);
+                        break;
+                    }
+                    FpgaPin.CLOCK.setState(LOW);
+
+                    while (FpgaPin.VALID.getState() == LOW) ;
+
+                    StringBuilder tubeCode = new StringBuilder();
+
+                    boolean[] tubeStates = new boolean[]{FpgaPin.TUBELEVEL_0.getState() == HIGH,
+                                                         FpgaPin.TUBELEVEL_1.getState() == HIGH,
+                                                         FpgaPin.TUBELEVEL_2.getState() == HIGH,
+                                                         FpgaPin.TUBELEVEL_3.getState() == HIGH,
+                                                         FpgaPin.TUBESUBLEVEL.getState() == HIGH,
+                                                         FpgaPin.TUBENUM_0.getState() == HIGH,
+                                                         FpgaPin.TUBENUM_1.getState() == HIGH,
+                                                         FpgaPin.TUBENUM_2.getState() == HIGH};
+
+                    new Thread(new classExtendingRunnable(tubeStates)).start();
+                }
+
+            }
+        });
+
+        thread.start();
+
+
         System.out.println("thing");
 
 
-        FpgaPin.TUBELEVEL_0.setState(PinState.HIGH);
-        Log.i(TAG,FpgaPin.CLOCK.getState().toString());
     }
 
     /**
@@ -23,28 +71,28 @@ public class main {
      * pin as appropriate
      */
     enum FpgaPin {
-        ENABLE              (RaspiBcmPin.GPIO_11, PinMode.DIGITAL_OUTPUT),
-        VALID               (RaspiBcmPin.GPIO_08, PinMode.DIGITAL_INPUT),
-        EMPTY               (RaspiBcmPin.GPIO_09, PinMode.DIGITAL_INPUT),
-        CLOCK               (RaspiBcmPin.GPIO_06, PinMode.DIGITAL_OUTPUT),
+        ENABLE                               (RaspiBcmPin.GPIO_11, PinMode.DIGITAL_OUTPUT),
+        VALID                                (RaspiBcmPin.GPIO_08, PinMode.DIGITAL_INPUT),
+        EMPTY                                (RaspiBcmPin.GPIO_09, PinMode.DIGITAL_INPUT),
+        CLOCK                                (RaspiBcmPin.GPIO_06, PinMode.DIGITAL_OUTPUT),
 
-        TUBELEVEL_0         (RaspiBcmPin.GPIO_18, PinMode.DIGITAL_INPUT),
-        TUBELEVEL_1         (RaspiBcmPin.GPIO_23, PinMode.DIGITAL_INPUT),
-        TUBELEVEL_2         (RaspiBcmPin.GPIO_24, PinMode.DIGITAL_INPUT),
-        TUBELEVEL_3         (RaspiBcmPin.GPIO_25, PinMode.DIGITAL_INPUT),
-        TUBESUBLEVEL        (RaspiBcmPin.GPIO_12, PinMode.DIGITAL_INPUT),
-        TUBENUM_0           (RaspiBcmPin.GPIO_16, PinMode.DIGITAL_INPUT),
-        TUBENUM_1           (RaspiBcmPin.GPIO_20, PinMode.DIGITAL_INPUT),
-        TUBENUM_2           (RaspiBcmPin.GPIO_21, PinMode.DIGITAL_INPUT),
+        TUBELEVEL_0                          (RaspiBcmPin.GPIO_18, PinMode.DIGITAL_INPUT),
+        TUBELEVEL_1                          (RaspiBcmPin.GPIO_23, PinMode.DIGITAL_INPUT),
+        TUBELEVEL_2                          (RaspiBcmPin.GPIO_24, PinMode.DIGITAL_INPUT),
+        TUBELEVEL_3                          (RaspiBcmPin.GPIO_25, PinMode.DIGITAL_INPUT),
+        TUBESUBLEVEL                         (RaspiBcmPin.GPIO_12, PinMode.DIGITAL_INPUT),
+        TUBENUM_0                            (RaspiBcmPin.GPIO_16, PinMode.DIGITAL_INPUT),
+        TUBENUM_1                            (RaspiBcmPin.GPIO_20, PinMode.DIGITAL_INPUT),
+        TUBENUM_2                            (RaspiBcmPin.GPIO_21, PinMode.DIGITAL_INPUT),
 
-        TUBERAD_0           (RaspiBcmPin.GPIO_26, PinMode.DIGITAL_INPUT),
-        TUBERAD_1           (RaspiBcmPin.GPIO_13, PinMode.DIGITAL_INPUT),
-        TUBERAD_2           (RaspiBcmPin.GPIO_05, PinMode.DIGITAL_INPUT),
-        TUBERAD_3           (RaspiBcmPin.GPIO_10, PinMode.DIGITAL_INPUT),
-        TUBERAD_4           (RaspiBcmPin.GPIO_04, PinMode.DIGITAL_INPUT),
-        TUBERAD_5           (RaspiBcmPin.GPIO_17, PinMode.DIGITAL_INPUT),
-        TUBERAD_6           (RaspiBcmPin.GPIO_27, PinMode.DIGITAL_INPUT),
-        TUBERAD_7           (RaspiBcmPin.GPIO_22, PinMode.DIGITAL_INPUT);
+        RAD_0                                (RaspiBcmPin.GPIO_26, PinMode.DIGITAL_INPUT),
+        RAD_1                                (RaspiBcmPin.GPIO_13, PinMode.DIGITAL_INPUT),
+        RAD_2                                (RaspiBcmPin.GPIO_05, PinMode.DIGITAL_INPUT),
+        RAD_3                                (RaspiBcmPin.GPIO_10, PinMode.DIGITAL_INPUT),
+        RAD_4                                (RaspiBcmPin.GPIO_04, PinMode.DIGITAL_INPUT),
+        RAD_5                                (RaspiBcmPin.GPIO_17, PinMode.DIGITAL_INPUT),
+        RAD_6                                (RaspiBcmPin.GPIO_27, PinMode.DIGITAL_INPUT),
+        RAD_7                                (RaspiBcmPin.GPIO_22, PinMode.DIGITAL_INPUT);
 
         private Pin pinCode;
         private PinMode mode;
