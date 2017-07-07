@@ -17,41 +17,56 @@ public class main {
 
 
         FpgaPin.ENABLE.setState(HIGH);
+        FpgaPin.CLOCK.setState(LOW);
+
 
         Thread thread = new Thread(new Runnable() {
             @Override
             public void run() {
 
-                while(!Thread.interrupted())
-                {
-                    if (FpgaPin.EMPTY.getState() == LOW) {
-                        Log.i(TAG, "No data to get; terminating read thread");
-                        return;
+                while(!Thread.interrupted()) {
+                    boolean[][] eventTubeStates = new boolean[][]{};
+                    int i = 0;
+
+                    while (!isStopFlag())
+                    {
+                        if (FpgaPin.EMPTY.getState() == LOW) {
+                            Log.i(TAG, "No data to get");
+                            break;
+                        }
+
+                        FpgaPin.CLOCK.setState(HIGH);
+                        try {
+                            Thread.sleep(1);
+                        } catch (InterruptedException e) {
+                            Log.e(TAG, "Reading thread interrupted while waiting; terminating read thread", e);
+                            break;
+                        }
+                        FpgaPin.CLOCK.setState(LOW);
+
+                        while (FpgaPin.VALID.getState() == LOW) ;
+
+                        eventTubeStates[i] = new boolean[]{FpgaPin.TUBELEVEL_0.getState()       == HIGH,
+                                                           FpgaPin.TUBELEVEL_1.getState()       == HIGH,
+                                                           FpgaPin.TUBELEVEL_2.getState()       == HIGH,
+                                                           FpgaPin.TUBELEVEL_3.getState()       == HIGH,
+                                                           FpgaPin.TUBESUBLEVEL.getState()      == HIGH,
+                                                           FpgaPin.TUBENUM_0.getState()         == HIGH,
+                                                           FpgaPin.TUBENUM_1.getState()         == HIGH,
+                                                           FpgaPin.TUBENUM_2.getState()         == HIGH,
+                                                           FpgaPin.RAD_0.getState()             == HIGH,
+                                                           FpgaPin.RAD_1.getState()             == HIGH,
+                                                           FpgaPin.RAD_2.getState()             == HIGH,
+                                                           FpgaPin.RAD_3.getState()             == HIGH,
+                                                           FpgaPin.RAD_4.getState()             == HIGH,
+                                                           FpgaPin.RAD_5.getState()             == HIGH,
+                                                           FpgaPin.RAD_6.getState()             == HIGH,
+                                                           FpgaPin.RAD_7.getState()             == HIGH};
+                        i++;
                     }
 
-                    FpgaPin.CLOCK.setState(HIGH);
-                    try {
-                        Thread.sleep(1);
-                    } catch (InterruptedException e) {
-                        Log.e(TAG, "Reading thread interrupted while waiting; terminating read thread", e);
-                        break;
-                    }
-                    FpgaPin.CLOCK.setState(LOW);
+                    new Thread(new GonWriter(eventTubeStates)).start();
 
-                    while (FpgaPin.VALID.getState() == LOW) ;
-
-                    StringBuilder tubeCode = new StringBuilder();
-
-                    boolean[] tubeStates = new boolean[]{FpgaPin.TUBELEVEL_0.getState() == HIGH,
-                                                         FpgaPin.TUBELEVEL_1.getState() == HIGH,
-                                                         FpgaPin.TUBELEVEL_2.getState() == HIGH,
-                                                         FpgaPin.TUBELEVEL_3.getState() == HIGH,
-                                                         FpgaPin.TUBESUBLEVEL.getState() == HIGH,
-                                                         FpgaPin.TUBENUM_0.getState() == HIGH,
-                                                         FpgaPin.TUBENUM_1.getState() == HIGH,
-                                                         FpgaPin.TUBENUM_2.getState() == HIGH};
-
-                    new Thread(new classExtendingRunnable(tubeStates)).start();
                 }
 
             }
@@ -63,6 +78,11 @@ public class main {
         System.out.println("thing");
 
 
+    }
+
+    public static boolean isStopFlag(){
+        return (FpgaPin.TUBELEVEL_0.getState() == HIGH) && (FpgaPin.TUBELEVEL_1.getState() == HIGH) &&
+                (FpgaPin.TUBELEVEL_2.getState() == HIGH) && (FpgaPin.TUBELEVEL_3.getState() == HIGH);
     }
 
     /**
