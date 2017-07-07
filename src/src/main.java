@@ -1,5 +1,7 @@
 import com.pi4j.io.gpio.*;
 
+import java.io.IOException;
+
 import static com.pi4j.io.gpio.PinState.LOW;
 import static com.pi4j.io.gpio.PinState.HIGH;
 
@@ -24,62 +26,80 @@ public class main {
             @Override
             public void run() {
 
-                while(!Thread.interrupted()) {
+                //if we are not asked to stop, keep reading data
+                while(!Thread.interrupted())
+                {
+                    //this is filled with data from one event, ie, 32 tubes
+                    //each sublist is one tube
                     boolean[][] eventTubeStates = new boolean[][]{};
+
+                    //a counter variable
                     int i = 0;
 
-                    while (!isStopFlag())
+                    //if there is data, go get it
+                    if(FpgaPin.EMPTY.getState() == LOW)
                     {
-                        if (FpgaPin.EMPTY.getState() == LOW) {
-                            Log.i(TAG, "No data to get");
-                            break;
+                        //keep reading tubes until there are no more tubes
+                        while (!isStopFlag()) {
+                            //pulse the clock for a moment
+                            FpgaPin.CLOCK.setState(HIGH);
+                            try {
+                                Thread.sleep(0, 1000);
+                            } catch (InterruptedException e) {
+                                Log.e(TAG, "Reading thread interrupted while waiting; terminating read thread", e);
+                                break;
+                            }
+                            FpgaPin.CLOCK.setState(LOW);
+
+                            //wait for the valid pin to go high from the FPGA, ensuring there is new data on the bus
+                            while (FpgaPin.VALID.getState() == LOW) ;
+
+                            //record the data for the tube into eventTubeStates
+                            eventTubeStates[i] = new boolean[]{FpgaPin.TUBELEVEL_0.getState() == HIGH,
+                                    FpgaPin.TUBELEVEL_1.getState() == HIGH,
+                                    FpgaPin.TUBELEVEL_2.getState() == HIGH,
+                                    FpgaPin.TUBELEVEL_3.getState() == HIGH,
+                                    FpgaPin.TUBESUBLEVEL.getState() == HIGH,
+                                    FpgaPin.TUBENUM_0.getState() == HIGH,
+                                    FpgaPin.TUBENUM_1.getState() == HIGH,
+                                    FpgaPin.TUBENUM_2.getState() == HIGH,
+                                    FpgaPin.RAD_0.getState() == HIGH,
+                                    FpgaPin.RAD_1.getState() == HIGH,
+                                    FpgaPin.RAD_2.getState() == HIGH,
+                                    FpgaPin.RAD_3.getState() == HIGH,
+                                    FpgaPin.RAD_4.getState() == HIGH,
+                                    FpgaPin.RAD_5.getState() == HIGH,
+                                    FpgaPin.RAD_6.getState() == HIGH,
+                                    FpgaPin.RAD_7.getState() == HIGH};
+                            //inc counter
+                            i++;
                         }
 
-                        FpgaPin.CLOCK.setState(HIGH);
-                        try {
-                            Thread.sleep(1);
-                        } catch (InterruptedException e) {
-                            Log.e(TAG, "Reading thread interrupted while waiting; terminating read thread", e);
-                            break;
-                        }
-                        FpgaPin.CLOCK.setState(LOW);
-
-                        while (FpgaPin.VALID.getState() == LOW) ;
-
-                        eventTubeStates[i] = new boolean[]{FpgaPin.TUBELEVEL_0.getState()       == HIGH,
-                                                           FpgaPin.TUBELEVEL_1.getState()       == HIGH,
-                                                           FpgaPin.TUBELEVEL_2.getState()       == HIGH,
-                                                           FpgaPin.TUBELEVEL_3.getState()       == HIGH,
-                                                           FpgaPin.TUBESUBLEVEL.getState()      == HIGH,
-                                                           FpgaPin.TUBENUM_0.getState()         == HIGH,
-                                                           FpgaPin.TUBENUM_1.getState()         == HIGH,
-                                                           FpgaPin.TUBENUM_2.getState()         == HIGH,
-                                                           FpgaPin.RAD_0.getState()             == HIGH,
-                                                           FpgaPin.RAD_1.getState()             == HIGH,
-                                                           FpgaPin.RAD_2.getState()             == HIGH,
-                                                           FpgaPin.RAD_3.getState()             == HIGH,
-                                                           FpgaPin.RAD_4.getState()             == HIGH,
-                                                           FpgaPin.RAD_5.getState()             == HIGH,
-                                                           FpgaPin.RAD_6.getState()             == HIGH,
-                                                           FpgaPin.RAD_7.getState()             == HIGH};
-                        i++;
+                        //send the event data over to a GonWriter to have it recorded to a file
+                        new Thread(new GonWriter(eventTubeStates)).start();
+                    } else {
+                        Log.i(TAG, "No data to get");
                     }
-
-                    new Thread(new GonWriter(eventTubeStates)).start();
-
                 }
-
             }
         });
 
+
+        //start the thread to read data, and don't end until user input
         thread.start();
-
-
-        System.out.println("thing");
-
-
+        try {
+            System.in.read();
+        } catch (IOException e) {
+            Log.e(TAG,"Interrupted while running, will shut down");
+        }
+        thread.interrupt();
     }
 
+    /**
+     * Detects if the FPGA is sending a  stop flag with all 4 tube level bits high, indicating the end of the event (all
+     * data for each tube has been sent)
+     * @return whether or not the FPGA is currenting sending a stop flag
+     */
     public static boolean isStopFlag(){
         return (FpgaPin.TUBELEVEL_0.getState() == HIGH) && (FpgaPin.TUBELEVEL_1.getState() == HIGH) &&
                 (FpgaPin.TUBELEVEL_2.getState() == HIGH) && (FpgaPin.TUBELEVEL_3.getState() == HIGH);
