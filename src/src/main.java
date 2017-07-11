@@ -7,6 +7,7 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
+import java.util.Properties;
 
 import static com.pi4j.io.gpio.PinState.LOW;
 import static com.pi4j.io.gpio.PinState.HIGH;
@@ -19,9 +20,15 @@ import static com.pi4j.io.gpio.PinState.HIGH;
 
 public class main {
     final static String TAG = main.class.getSimpleName();
-    final static GpioController gpioController = GpioFactory.getInstance();
 
     public static void main(String[] args) {
+        //make pi4j use the new version of wiringPi on the RPi
+        //instead of the old statically linked version
+        System.setProperty("pi4j.linking", "dynamic");
+
+        //make sure that the BCM numbering is used; RaspiBcmPin isn't enough
+        GpioFactory.setDefaultProvider(new RaspiGpioProvider(RaspiPinNumberingScheme.BROADCOM_PIN_NUMBERING));
+
         //initialize rd pins with the FPGA
         FpgaPin.ENABLE.setState(LOW);
         FpgaPin.CLOCK.setState(LOW); //should this pulse instead?
@@ -43,7 +50,7 @@ public class main {
                 {
                     //this is filled with data from one event, ie, 32 tubes
                     //each sublist is one tube
-                    boolean[][] eventTubeStates = new boolean[][]{};
+                    boolean[][] eventTubeStates = new boolean[33][16];
 
                     //a counter variable for each event.  it counts the number of tubes that have passed
                     int tubeCounter = 0;
@@ -51,41 +58,38 @@ public class main {
                     //if there is data, go get it
                     if (FpgaPin.EMPTY.getState() == LOW)
                     {
-                        //temporary timing
-                        long validNanotime;
-                        long recordNanotime;
-                        long finalNanotime;
                         //keep reading tubes until there are no more tubes, or you run out for some reason
                         while (!isStopFlag() || FpgaPin.EMPTY.getState() == LOW) {
                             //cycle the clock for a moment.  note that this assumes it takes 0 time to record data
                             //what happens FPGA-side if something is interrupted for some reason over here?
                             FpgaPin.CLOCK.setState(HIGH);
                             try {
-                                Thread.sleep(0, 100);
+                                Thread.sleep(10, 0);
                             } catch (InterruptedException e) {
                                 Log.e(TAG, "Reading thread interrupted while waiting; terminating read thread", e);
                                 break;
                             }
                             FpgaPin.CLOCK.setState(LOW);
                             try {
-                                Thread.sleep(0, 100);
+                                Thread.sleep(10, 0);
                             } catch (InterruptedException e) {
                                 Log.e(TAG, "Reading thread interrupted while waiting; terminating read thread", e);
                                 break;
                             }
 
-                            validNanotime = System.nanoTime();
                             //wait for the valid pin to go high from the FPGA, ensuring there is new data on the bus
                             while (FpgaPin.VALID.getState() == LOW) ;
 
-                            recordNanotime = System.nanoTime();
                             //record the data for the tube into eventTubeStates
-                            eventTubeStates[tubeCounter] = recordCurrentInputs();
-                            finalNanotime = System.nanoTime();
+                            try {
+                                eventTubeStates[tubeCounter] = recordCurrentInputs();
+                            } catch (ArrayIndexOutOfBoundsException e) {
+                                Log.w(TAG,"Stop flag not encountered on 33rd event; will move on to next file");
+                                break;
+                            }
+
                             tubeCounter++;
 
-                            Log.i(TAG,"Valid: "+Long.toString(finalNanotime-validNanotime)+", Record: "+
-                                    Long.toString(finalNanotime-recordNanotime));
                         }
 
                         //send the event data over to a GonWriter to have it recorded to a file
@@ -215,14 +219,16 @@ public class main {
 
             badModeWarn = "Pin " + pinCode.getName() + " not configured as digital I/O" +
                     " instead configured as " + mode.getName() + " and will not function";
+            GpioFactory.setDefaultProvider(new RaspiGpioProvider(RaspiPinNumberingScheme.BROADCOM_PIN_NUMBERING));
 
             //provision the pin as either input or output
             switch (mode) {
                 case DIGITAL_INPUT:
-                    pin = gpioController.provisionDigitalInputPin(pinCode);
+                    pin = GpioFactory.getInstance().provisionDigitalInputPin(pinCode);
                     break;
                 case DIGITAL_OUTPUT:
-                    pin = gpioController.provisionDigitalOutputPin(pinCode);
+                    Log.i(TAG,pinCode.getName()+" is output");
+                    pin = GpioFactory.getInstance().provisionDigitalOutputPin(pinCode);
                     break;
                 default:
                     Log.w(TAG, badModeWarn);
