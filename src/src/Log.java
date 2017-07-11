@@ -1,11 +1,12 @@
 /**
- * Created by root on 6/28/17.
+ * A class to provide a uniform system logging standard
  */
 public class Log {
     public static void e(String TAG, String msg, Exception e){
         e(TAG,msg);
         e.printStackTrace();
     }
+
     public static void e(String TAG, String msg){
         System.out.println(TAG+"/e: "+msg);
     }
@@ -16,5 +17,9 @@ public class Log {
 
     public static void i(String TAG, String msg){
         System.out.println(TAG+"/i: "+msg);
+    }
+
+    public static void v(String TAG, String msg){
+        System.out.println(TAG+"/v: "+msg);
     }
 }

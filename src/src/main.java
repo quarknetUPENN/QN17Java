@@ -23,7 +23,7 @@ public class main {
 
     public static void main(String[] args) {
         //initialize rd pins with the FPGA
-        FpgaPin.ENABLE.setState(HIGH); //is this right?
+        FpgaPin.ENABLE.setState(LOW);
         FpgaPin.CLOCK.setState(LOW); //should this pulse instead?
 
 
@@ -32,95 +32,123 @@ public class main {
         if(dataDir == null)
             return;
 
-
         //create a new thread to handle receiving all the data and sending it to GonWriters to record
-        Thread thread = new Thread(new Runnable() {
+        Thread pinRecorder = new Thread(new Runnable() {
             @Override
             public void run() {
-
                 //counts how many events have been received
                 int eventN = 1;
                 //if we are not asked to stop, keep reading data
-                while (!Thread.interrupted()) {
+                while (!Thread.interrupted())
+                {
                     //this is filled with data from one event, ie, 32 tubes
                     //each sublist is one tube
                     boolean[][] eventTubeStates = new boolean[][]{};
 
                     //a counter variable for each event.  it counts the number of tubes that have passed
-                    int i = 0;
+                    int tubeCounter = 0;
 
                     //if there is data, go get it
-                    if (FpgaPin.EMPTY.getState() == LOW) {
-                        //keep reading tubes until there are no more tubes
-                        while (!isStopFlag()) {
-                            //pulse the clock for a moment
+                    if (FpgaPin.EMPTY.getState() == LOW)
+                    {
+                        //temporary timing
+                        long validNanotime;
+                        long recordNanotime;
+                        long finalNanotime;
+                        //keep reading tubes until there are no more tubes, or you run out for some reason
+                        while (!isStopFlag() || FpgaPin.EMPTY.getState() == LOW) {
+                            //cycle the clock for a moment.  note that this assumes it takes 0 time to record data
+                            //what happens FPGA-side if something is interrupted for some reason over here?
                             FpgaPin.CLOCK.setState(HIGH);
                             try {
-                                Thread.sleep(0, 1000);
+                                Thread.sleep(0, 100);
                             } catch (InterruptedException e) {
                                 Log.e(TAG, "Reading thread interrupted while waiting; terminating read thread", e);
                                 break;
                             }
                             FpgaPin.CLOCK.setState(LOW);
+                            try {
+                                Thread.sleep(0, 100);
+                            } catch (InterruptedException e) {
+                                Log.e(TAG, "Reading thread interrupted while waiting; terminating read thread", e);
+                                break;
+                            }
 
+                            validNanotime = System.nanoTime();
                             //wait for the valid pin to go high from the FPGA, ensuring there is new data on the bus
                             while (FpgaPin.VALID.getState() == LOW) ;
 
+                            recordNanotime = System.nanoTime();
                             //record the data for the tube into eventTubeStates
-                            eventTubeStates[i] = new boolean[]{FpgaPin.TUBELEVEL_0.getState() == HIGH,
-                                    FpgaPin.TUBELEVEL_1.getState() == HIGH,
-                                    FpgaPin.TUBELEVEL_2.getState() == HIGH,
-                                    FpgaPin.TUBELEVEL_3.getState() == HIGH,
-                                    FpgaPin.TUBESUBLEVEL.getState() == HIGH,
-                                    FpgaPin.TUBENUM_0.getState() == HIGH,
-                                    FpgaPin.TUBENUM_1.getState() == HIGH,
-                                    FpgaPin.TUBENUM_2.getState() == HIGH,
-                                    FpgaPin.RAD_0.getState() == HIGH,
-                                    FpgaPin.RAD_1.getState() == HIGH,
-                                    FpgaPin.RAD_2.getState() == HIGH,
-                                    FpgaPin.RAD_3.getState() == HIGH,
-                                    FpgaPin.RAD_4.getState() == HIGH,
-                                    FpgaPin.RAD_5.getState() == HIGH,
-                                    FpgaPin.RAD_6.getState() == HIGH,
-                                    FpgaPin.RAD_7.getState() == HIGH};
-                            //inc counter
-                            i++;
+                            eventTubeStates[tubeCounter] = recordCurrentInputs();
+                            finalNanotime = System.nanoTime();
+                            tubeCounter++;
+
+                            Log.i(TAG,"Valid: "+Long.toString(finalNanotime-validNanotime)+", Record: "+
+                                    Long.toString(finalNanotime-recordNanotime));
                         }
 
                         //send the event data over to a GonWriter to have it recorded to a file
                         new Thread(new GonWriter(new File(dataDir, "event" + Integer.toString(eventN) + ".gon"), eventTubeStates)).start();
+                        eventN++;
                     } else {
                         Log.i(TAG, "No data to get");
                     }
-                    eventN++;
                 }
+                Log.i(TAG,"Interrupt received, ending pin listener thread");
             }
         });
 
 
         //start the thread to read data, and don't end until user input
-        thread.start();
+        pinRecorder.start();
         try {
             System.in.read();
         } catch (IOException e) {
             Log.e(TAG, "Interrupted while running, will shut down");
         }
-        thread.interrupt();
+        pinRecorder.interrupt();
     }
 
     /**
-     * Detects if the FPGA is sending a  stop flag with all 4 tube level bits high, indicating the end of the event (all
+     * Detects if the FPGA is sending a stop flag with all bits high, indicating the end of the event (all
      * data for each tube has been sent)
      *
-     * @return whether or not the FPGA is currenting sending a stop flag
+     * @return whether or not the FPGA is currently sending a stop flag
      */
     static boolean isStopFlag() {
-        return (FpgaPin.TUBELEVEL_0.getState() == HIGH) && (FpgaPin.TUBELEVEL_1.getState() == HIGH) &&
-                (FpgaPin.TUBELEVEL_2.getState() == HIGH) && (FpgaPin.TUBELEVEL_3.getState() == HIGH);
+        boolean isStop = true;
+        //iterate through every current pin.  if they are all high, then return true
+        for(boolean pin : recordCurrentInputs()){
+            isStop = isStop && pin;
+        }
+        return isStop;
     }
 
-    //make a new folder from the current working dir, with a time stamp
-    //if the folder already exists, kill it with fire
+    /**
+     * Checks the levels of all the data pins connected to the FPGA and returns them as booleans in a list
+     * @return a boolean list with the current input on each input pin
+     */
+    static boolean[] recordCurrentInputs(){
+        return new boolean[]{
+                FpgaPin.TUBELEVEL_0.getState()  ==     HIGH,
+                FpgaPin.TUBELEVEL_1.getState()  ==     HIGH,
+                FpgaPin.TUBELEVEL_2.getState()  ==     HIGH,
+                FpgaPin.TUBELEVEL_3.getState()  ==     HIGH,
+                FpgaPin.TUBESUBLEVEL.getState() ==     HIGH,
+                FpgaPin.TUBENUM_0.getState()    ==     HIGH,
+                FpgaPin.TUBENUM_1.getState()    ==     HIGH,
+                FpgaPin.TUBENUM_2.getState()    ==     HIGH,
+                FpgaPin.RAD_0.getState()        ==     HIGH,
+                FpgaPin.RAD_1.getState()        ==     HIGH,
+                FpgaPin.RAD_2.getState()        ==     HIGH,
+                FpgaPin.RAD_3.getState()        ==     HIGH,
+                FpgaPin.RAD_4.getState()        ==     HIGH,
+                FpgaPin.RAD_5.getState()        ==     HIGH,
+                FpgaPin.RAD_6.getState()        ==     HIGH,
+                FpgaPin.RAD_7.getState()        ==     HIGH};
+    }
+
 
     /**
      * Makes a new folder in the current working dir, with a time stamp added to "data"
@@ -238,6 +266,16 @@ public class main {
             }
         }
 
+        /**
+         * Logs the current state of the pin in the terminal
+         */
+        public void logState(){
+            if(getState() == null)
+                Log.v(TAG,"Null value for pin state, invalid pin configuration");
+            else
+                Log.v(TAG,pinCode.getName()+" is currently "+getState().getName()+" at nanotime "+Long.toString(System.nanoTime()));
+        }
+
 
         /**
          * Gets the current pin object  If not digital I/O, returns null
@@ -270,8 +308,5 @@ public class main {
                     return null;
             }
         }
-
     }
-
-
 }
