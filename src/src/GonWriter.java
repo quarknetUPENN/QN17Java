@@ -23,6 +23,8 @@ public class GonWriter implements Runnable {
 
     @Override
     public void run() {
+        return;
+        /*
         //go through every tube in the received event array, and write them all to the specified file
         for(boolean[] tubeState : eventTubeStates)
         {
@@ -33,7 +35,7 @@ public class GonWriter implements Runnable {
             } catch (IOException e) {
                 Log.e(TAG,"Failed to write line to gon file "+targetWriteFile.getPath()+" will leave incomplete file",e);
             }
-        }
+        }*/
     }
 
     /**

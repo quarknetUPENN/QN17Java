@@ -1,6 +1,7 @@
-import com.pi4j.io.gpio.GpioFactory;
-import com.pi4j.io.gpio.RaspiGpioProvider;
-import com.pi4j.io.gpio.RaspiPinNumberingScheme;
+import com.pi4j.io.gpio.*;
+import com.pi4j.io.gpio.event.GpioPinDigitalStateChangeEvent;
+import com.pi4j.io.gpio.event.GpioPinListener;
+import com.pi4j.io.gpio.event.GpioPinListenerDigital;
 
 import java.io.File;
 
@@ -9,7 +10,7 @@ import static com.pi4j.io.gpio.PinState.LOW;
 
 
 /**
- * Tests the GonWriter by writing two lines of fake data to a file
+ * Test
  */
 public class PinWriteTest {
     final static String TAG = PinWriteTest.class.getSimpleName();
@@ -18,23 +19,32 @@ public class PinWriteTest {
         //instead of the old statically linked version
         System.setProperty("pi4j.linking", "dynamic");
 
-        while(true){
-            main.FpgaPin.CLOCK.setState(HIGH);
-            Log.i(TAG,"high");
-            try {
-                Thread.sleep(1000, 0);
-            } catch (InterruptedException e) {
-                Log.e(TAG, "Reading thread interrupted while waiting; terminating read thread", e);
-                break;
+
+
+        main.FpgaPin.CLOCK.setPwm(512);
+
+        //this don't actually work, not sure why
+        main.FpgaPin.CLOCK.getPin().addListener(new GpioPinListenerDigital() {
+            @Override
+            public void handleGpioPinDigitalStateChangeEvent(GpioPinDigitalStateChangeEvent event) {
+                if(event.getEdge() == PinEdge.RISING)
+                    Log.i(TAG,"rising");
             }
-            main.FpgaPin.CLOCK.setState(LOW);
-            Log.i(TAG,"low");
-            try {
-                Thread.sleep(1000, 0);
-            } catch (InterruptedException e) {
-                Log.e(TAG, "Reading thread interrupted while waiting; terminating read thread", e);
-                break;
-            }
+        });
+        Log.i(TAG,main.FpgaPin.CLOCK.getMode().getName());
+        try {
+            Thread.sleep(10000, 0);
+        } catch (InterruptedException e) {
+            Log.e(TAG, "Reading thread interrupted while waiting; terminating read thread", e);
+            return;
         }
+        /*((GpioPinDigitalOutput)main.FpgaPin.CLOCK.getPin()).toggle();
+        Log.i(TAG,main.FpgaPin.CLOCK.getState().getName());
+        try {
+            Thread.sleep(1000, 0);
+        } catch (InterruptedException e) {
+            Log.e(TAG, "Reading thread interrupted while waiting; terminating read thread", e);
+            return;
+        }*/
     }
 }

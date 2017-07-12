@@ -64,18 +64,12 @@ public class main {
                             //what happens FPGA-side if something is interrupted for some reason over here?
                             FpgaPin.CLOCK.setState(HIGH);
                             try {
-                                Thread.sleep(10, 0);
+                                Thread.sleep(0, 1);
                             } catch (InterruptedException e) {
                                 Log.e(TAG, "Reading thread interrupted while waiting; terminating read thread", e);
                                 break;
                             }
                             FpgaPin.CLOCK.setState(LOW);
-                            try {
-                                Thread.sleep(10, 0);
-                            } catch (InterruptedException e) {
-                                Log.e(TAG, "Reading thread interrupted while waiting; terminating read thread", e);
-                                break;
-                            }
 
                             //wait for the valid pin to go high from the FPGA, ensuring there is new data on the bus
                             while (FpgaPin.VALID.getState() == LOW) ;
@@ -185,13 +179,13 @@ public class main {
         ENABLE(RaspiBcmPin.GPIO_11, PinMode.DIGITAL_OUTPUT),
         VALID(RaspiBcmPin.GPIO_08, PinMode.DIGITAL_INPUT),
         EMPTY(RaspiBcmPin.GPIO_09, PinMode.DIGITAL_INPUT),
-        CLOCK(RaspiBcmPin.GPIO_06, PinMode.DIGITAL_OUTPUT),
+        CLOCK(RaspiBcmPin.GPIO_12, PinMode.PWM_OUTPUT),
 
         TUBELEVEL_0(RaspiBcmPin.GPIO_18, PinMode.DIGITAL_INPUT),
         TUBELEVEL_1(RaspiBcmPin.GPIO_23, PinMode.DIGITAL_INPUT),
         TUBELEVEL_2(RaspiBcmPin.GPIO_24, PinMode.DIGITAL_INPUT),
         TUBELEVEL_3(RaspiBcmPin.GPIO_25, PinMode.DIGITAL_INPUT),
-        TUBESUBLEVEL(RaspiBcmPin.GPIO_12, PinMode.DIGITAL_INPUT),
+        TUBESUBLEVEL(RaspiBcmPin.GPIO_07, PinMode.DIGITAL_INPUT),
         TUBENUM_0(RaspiBcmPin.GPIO_16, PinMode.DIGITAL_INPUT),
         TUBENUM_1(RaspiBcmPin.GPIO_20, PinMode.DIGITAL_INPUT),
         TUBENUM_2(RaspiBcmPin.GPIO_21, PinMode.DIGITAL_INPUT),
@@ -210,7 +204,7 @@ public class main {
 
         private String badModeWarn;
 
-        private GpioPinDigital pin;
+        private GpioPin pin;
 
 
         FpgaPin(Pin pinCode, PinMode mode) {
@@ -227,8 +221,10 @@ public class main {
                     pin = GpioFactory.getInstance().provisionDigitalInputPin(pinCode);
                     break;
                 case DIGITAL_OUTPUT:
-                    Log.i(TAG,pinCode.getName()+" is output");
                     pin = GpioFactory.getInstance().provisionDigitalOutputPin(pinCode);
+                    break;
+                case PWM_OUTPUT:
+                    pin = GpioFactory.getInstance().provisionPwmOutputPin(pinCode);
                     break;
                 default:
                     Log.w(TAG, badModeWarn);
@@ -250,6 +246,10 @@ public class main {
                 case DIGITAL_OUTPUT:
                     ((GpioPinDigitalOutput) pin).setState(state);
                     break;
+                case PWM_OUTPUT:
+                    Log.w(TAG, "Attempted state set on pin " + pinCode.getName() + " not configured as digital output" +
+                            " instead configured as " + mode.getName() + ".  Will ignore instruction");
+                    break;
                 default:
                     Log.w(TAG, badModeWarn);
             }
@@ -265,7 +265,11 @@ public class main {
             switch (mode) {
                 case DIGITAL_INPUT:
                 case DIGITAL_OUTPUT:
-                    return pin.getState();
+                    return ((GpioPinDigital) pin).getState();
+                case PWM_OUTPUT:
+                    Log.w(TAG, "Attempted state set on pin " + pinCode.getName() + " not configured as digital output" +
+                            " instead configured as " + mode.getName() + ".  Will ignore instruction");
+                    return null;
                 default:
                     Log.w(TAG, badModeWarn);
                     return null;
@@ -282,16 +286,47 @@ public class main {
                 Log.v(TAG,pinCode.getName()+" is currently "+getState().getName()+" at nanotime "+Long.toString(System.nanoTime()));
         }
 
+        public void setPwm(int freq){
+            switch(mode)
+            {
+                case DIGITAL_INPUT:
+                case DIGITAL_OUTPUT:
+                    Log.w(TAG,"Attempted PWM set on pin " + pinCode.getName() + " not configured as digital output" +
+                            " instead configured as " + mode.getName() + ".  Will ignore instruction");
+                case PWM_OUTPUT:
+                    ((GpioPinPwmOutput) pin).setPwm(512);
+                default:
+                    Log.w(TAG,badModeWarn);
+            }
+        }
+
+
+        public int getPwm(){
+            switch(mode)
+            {
+                case DIGITAL_INPUT:
+                case DIGITAL_OUTPUT:
+                    Log.w(TAG,"Attempted PWM get on pin " + pinCode.getName() + " not configured as digital output" +
+                            " instead configured as " + mode.getName() + ".  Will return 0");
+                    return 0;
+                case PWM_OUTPUT:
+                    return ((GpioPinPwmOutput) pin).getPwm();
+                default:
+                    Log.w(TAG,badModeWarn);
+                    return 0;
+            }
+        }
 
         /**
          * Gets the current pin object  If not digital I/O, returns null
          *
          * @return the digital pin object
          */
-        public GpioPinDigital getPin() {
+        public GpioPin getPin() {
             switch (mode) {
                 case DIGITAL_INPUT:
                 case DIGITAL_OUTPUT:
+                case PWM_OUTPUT:
                     return pin;
                 default:
                     Log.w(TAG, badModeWarn);
@@ -308,6 +343,7 @@ public class main {
             switch (mode) {
                 case DIGITAL_INPUT:
                 case DIGITAL_OUTPUT:
+                case PWM_OUTPUT:
                     return mode;
                 default:
                     Log.w(TAG, badModeWarn);
