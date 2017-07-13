@@ -56,8 +56,8 @@ public class main {
                     int tubeCounter = 0;
 
                     //if there is data, go get it
-                    if (FpgaPin.EMPTY.getState() == LOW)
-                    {
+
+                    if (FpgaPin.EMPTY.getState() == LOW) {
                         //keep reading tubes until there are no more tubes, or you run out for some reason
                         while (!isStopFlag() || FpgaPin.EMPTY.getState() == LOW) {
                             //cycle the clock for a moment.  note that this assumes it takes 0 time to record data
@@ -72,26 +72,32 @@ public class main {
                             FpgaPin.CLOCK.setState(LOW);
 
                             //wait for the valid pin to go high from the FPGA, ensuring there is new data on the bus
-                            while (FpgaPin.VALID.getState() == LOW) ;
+                            while ((FpgaPin.VALID.getState() == LOW)) ;
 
                             //record the data for the tube into eventTubeStates
-                            try {
-                                eventTubeStates[tubeCounter] = recordCurrentInputs();
-                            } catch (ArrayIndexOutOfBoundsException e) {
-                                Log.w(TAG,"Stop flag not encountered on 33rd event; will move on to next file");
-                                break;
-                            }
+                            //while (tubeCounter < 33){
+                                try {
+                                    eventTubeStates[tubeCounter] = recordCurrentInputs();
+                                } catch (ArrayIndexOutOfBoundsException e) {
+                                    Log.w(TAG, "Stop flag not encountered on 33rd event; will move on to next file");
+
+                                    break;
+                                }
 
                             tubeCounter++;
+                            //}
 
                         }
+
 
                         //send the event data over to a GonWriter to have it recorded to a file
                         new Thread(new GonWriter(new File(dataDir, "event" + Integer.toString(eventN) + ".gon"), eventTubeStates)).start();
                         eventN++;
-                    } else {
+                    }
+                     else {
                         Log.i(TAG, "No data to get");
                     }
+
                 }
                 Log.i(TAG,"Interrupt received, ending pin listener thread");
             }
@@ -179,7 +185,7 @@ public class main {
         ENABLE(RaspiBcmPin.GPIO_11, PinMode.DIGITAL_OUTPUT),
         VALID(RaspiBcmPin.GPIO_08, PinMode.DIGITAL_INPUT),
         EMPTY(RaspiBcmPin.GPIO_09, PinMode.DIGITAL_INPUT),
-        CLOCK(RaspiBcmPin.GPIO_12, PinMode.PWM_OUTPUT),
+        CLOCK(RaspiBcmPin.GPIO_19, PinMode.DIGITAL_OUTPUT),
 
         TUBELEVEL_0(RaspiBcmPin.GPIO_18, PinMode.DIGITAL_INPUT),
         TUBELEVEL_1(RaspiBcmPin.GPIO_23, PinMode.DIGITAL_INPUT),
@@ -228,6 +234,7 @@ public class main {
                     break;
                 default:
                     Log.w(TAG, badModeWarn);
+                    break;
             }
         }
 
@@ -240,15 +247,12 @@ public class main {
         public void setState(PinState state) {
             switch (mode) {
                 case DIGITAL_INPUT:
+                case PWM_OUTPUT:
                     Log.w(TAG, "Attempted state set on pin " + pinCode.getName() + " not configured as digital output" +
                             " instead configured as " + mode.getName() + ".  Will ignore instruction");
                     break;
                 case DIGITAL_OUTPUT:
                     ((GpioPinDigitalOutput) pin).setState(state);
-                    break;
-                case PWM_OUTPUT:
-                    Log.w(TAG, "Attempted state set on pin " + pinCode.getName() + " not configured as digital output" +
-                            " instead configured as " + mode.getName() + ".  Will ignore instruction");
                     break;
                 default:
                     Log.w(TAG, badModeWarn);
@@ -293,10 +297,13 @@ public class main {
                 case DIGITAL_OUTPUT:
                     Log.w(TAG,"Attempted PWM set on pin " + pinCode.getName() + " not configured as digital output" +
                             " instead configured as " + mode.getName() + ".  Will ignore instruction");
+                    break;
                 case PWM_OUTPUT:
                     ((GpioPinPwmOutput) pin).setPwm(512);
+                    break;
                 default:
                     Log.w(TAG,badModeWarn);
+                    break;
             }
         }
 

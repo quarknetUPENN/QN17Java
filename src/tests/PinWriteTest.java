@@ -4,6 +4,7 @@ import com.pi4j.io.gpio.event.GpioPinListener;
 import com.pi4j.io.gpio.event.GpioPinListenerDigital;
 
 import java.io.File;
+import java.io.IOException;
 
 import static com.pi4j.io.gpio.PinState.HIGH;
 import static com.pi4j.io.gpio.PinState.LOW;
@@ -21,30 +22,56 @@ public class PinWriteTest {
 
 
 
-        main.FpgaPin.CLOCK.setPwm(512);
+
+        Thread thread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                GpioPinDigitalOutput CLOCK = GpioFactory.getInstance().provisionDigitalOutputPin(RaspiBcmPin.GPIO_19);
+                CLOCK.setState(HIGH);
+                try {
+                    while (!Thread.interrupted()) {
+                        CLOCK.setState(HIGH);
+                        Thread.sleep(100, 0);
+                        System.out.println("1 "+ CLOCK.getState());
+                        CLOCK.setState(LOW);
+                        Thread.sleep(100, 0);
+                        System.out.println("2 "+ CLOCK.getState());
+                    }
+                } catch (InterruptedException e){
+                    Log.e(TAG,"interrupted while pulsing clock, stopping",e);
+                }
+
+                Log.i(TAG,"Stopping clock pulsing thread");
+            }
+        });
+
+        thread.start();
 
         //this don't actually work, not sure why
-        main.FpgaPin.CLOCK.getPin().addListener(new GpioPinListenerDigital() {
+/*        main.FpgaPin.CLOCK.getPin().addListener(new GpioPinListenerDigital() {
             @Override
             public void handleGpioPinDigitalStateChangeEvent(GpioPinDigitalStateChangeEvent event) {
                 if(event.getEdge() == PinEdge.RISING)
-                    Log.i(TAG,"rising");
+                    Log.i(TAG,"Rising edge");
+                else
+                    Log.i(TAG,"Not rising edge");
             }
-        });
-        Log.i(TAG,main.FpgaPin.CLOCK.getMode().getName());
+        });*/
+
+    //    Log.i(TAG,main.FpgaPin.CLOCK.getMode().getName());
         try {
-            Thread.sleep(10000, 0);
-        } catch (InterruptedException e) {
+            System.in.read();
+        } catch (IOException e) {
             Log.e(TAG, "Reading thread interrupted while waiting; terminating read thread", e);
-            return;
         }
-        /*((GpioPinDigitalOutput)main.FpgaPin.CLOCK.getPin()).toggle();
+        thread.interrupt();
+  //      ((GpioPinDigitalOutput)main.FpgaPin.CLOCK.getPin()).toggle();
         Log.i(TAG,main.FpgaPin.CLOCK.getState().getName());
         try {
             Thread.sleep(1000, 0);
         } catch (InterruptedException e) {
             Log.e(TAG, "Reading thread interrupted while waiting; terminating read thread", e);
             return;
-        }*/
+        }
     }
 }
