@@ -15,7 +15,7 @@ public class PinReadTest {
                     main.FpgaPin.ENABLE.logState();
                     main.FpgaPin.VALID.logState();
                     main.FpgaPin.EMPTY.logState();
-                    main.FpgaPin.CLOCK.logState();
+                    main.FpgaPin.CLK.logState();
                     main.FpgaPin.TUBELEVEL_0.logState();
                     main.FpgaPin.TUBELEVEL_1.logState();
                     main.FpgaPin.TUBELEVEL_2.logState();

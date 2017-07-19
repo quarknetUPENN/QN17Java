@@ -3,11 +3,8 @@ import org.apache.commons.io.FileUtils;
 
 import java.io.File;
 import java.io.IOException;
-import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.Locale;
-import java.util.Properties;
 
 import static com.pi4j.io.gpio.PinState.LOW;
 import static com.pi4j.io.gpio.PinState.HIGH;
@@ -30,8 +27,9 @@ public class main {
         GpioFactory.setDefaultProvider(new RaspiGpioProvider(RaspiPinNumberingScheme.BROADCOM_PIN_NUMBERING));
 
         //initialize rd pins with the FPGA
-        FpgaPin.ENABLE.setState(LOW);
-        FpgaPin.CLOCK.setState(LOW); //should this pulse instead?
+        FpgaPin.ENABLE.setState(HIGH);
+        FpgaPin.CLK.setState(HIGH); //should this pulse instead?
+
 
 
         //create the directory to store all the data from this run in
@@ -43,11 +41,13 @@ public class main {
         Thread pinRecorder = new Thread(new Runnable() {
             @Override
             public void run() {
+                Log.v(TAG, "Enter thread");
                 //counts how many events have been received
                 int eventN = 1;
                 //if we are not asked to stop, keep reading data
                 while (!Thread.interrupted())
                 {
+                 Log.v(TAG, "Enter first while loop");
                     //this is filled with data from one event, ie, 32 tubes
                     //each sublist is one tube
                     boolean[][] eventTubeStates = new boolean[33][16];
@@ -57,45 +57,55 @@ public class main {
 
                     //if there is data, go get it
 
+                    System.out.println(FpgaPin.EMPTY.getState());
                     if (FpgaPin.EMPTY.getState() == LOW) {
+                        Log.v(TAG, "Going to read data");
                         //keep reading tubes until there are no more tubes, or you run out for some reason
-                        while (!isStopFlag() || FpgaPin.EMPTY.getState() == LOW) {
-                            //cycle the clock for a moment.  note that this assumes it takes 0 time to record data
-                            //what happens FPGA-side if something is interrupted for some reason over here?
-                            FpgaPin.CLOCK.setState(HIGH);
-                            try {
+                        try {
+                            while ((!isStopFlag()) || (FpgaPin.EMPTY.getState() == LOW)) {
+                                //cycle the clock for a moment.  note that this assumes it takes 0 time to record data
+                                //what happens FPGA-side if something is interrupted for some reason over here?
+                                FpgaPin.CLK.setState(HIGH);
+                                Log.v(TAG, "Clock is now "+ FpgaPin.CLK.getState());
+
                                 Thread.sleep(0, 1);
-                            } catch (InterruptedException e) {
-                                Log.e(TAG, "Reading thread interrupted while waiting; terminating read thread", e);
-                                break;
-                            }
-                            FpgaPin.CLOCK.setState(LOW);
+                                FpgaPin.CLK.setState(LOW);
+                                Log.v(TAG, "Clock is now "+ FpgaPin.CLK.getState());
 
-                            //wait for the valid pin to go high from the FPGA, ensuring there is new data on the bus
-                            while ((FpgaPin.VALID.getState() == LOW)) ;
+                                Thread.sleep(0, 1);
+                                //wait for the valid pin to go high from the FPGA, ensuring there is new data on the bus
+                                //while ((FpgaPin.VALID.getState() == LOW)) ;
 
-                            //record the data for the tube into eventTubeStates
-                            //while (tubeCounter < 33){
+                                //record the data for the tube into eventTubeStates
+                                //while (tubeCounter < 33){
                                 try {
                                     eventTubeStates[tubeCounter] = recordCurrentInputs();
+                                    Log.v(TAG, "Writing inputs...");
                                 } catch (ArrayIndexOutOfBoundsException e) {
                                     Log.w(TAG, "Stop flag not encountered on 33rd event; will move on to next file");
-
                                     break;
                                 }
 
-                            tubeCounter++;
-                            //}
-
+                                tubeCounter++;
+                            }
                         }
 
-
+                        catch (InterruptedException e) {
+                            Log.e(TAG, "Reading thread interrupted while waiting; terminating read thread", e);
+                            break;
+                        }
                         //send the event data over to a GonWriter to have it recorded to a file
                         new Thread(new GonWriter(new File(dataDir, "event" + Integer.toString(eventN) + ".gon"), eventTubeStates)).start();
                         eventN++;
                     }
                      else {
-                        Log.i(TAG, "No data to get");
+                        Log.i(TAG, "No data to get, TubeSubLevel is "+FpgaPin.TUBESUBLEVEL.getState().getName());
+                        try {
+                            Thread.sleep(10);
+                        }
+                        catch(InterruptedException e){
+                            e.printStackTrace();
+                        }
                     }
 
                 }
@@ -121,11 +131,13 @@ public class main {
      * @return whether or not the FPGA is currently sending a stop flag
      */
     static boolean isStopFlag() {
+
         boolean isStop = true;
         //iterate through every current pin.  if they are all high, then return true
         for(boolean pin : recordCurrentInputs()){
             isStop = isStop && pin;
         }
+        Log.v(TAG,"Stop flag reached");
         return isStop;
     }
 
@@ -160,8 +172,8 @@ public class main {
      * @return a File object representing the newly created or cleaned directory
      */
     static File createTimeStampedDataDir(){
-        SimpleDateFormat dateFormatter = new SimpleDateFormat("MM-dd-yy_hh-mm");
-        File dataDir = new File(dateFormatter.format(new Date()) + "data");
+        SimpleDateFormat dateFormatter = new SimpleDateFormat("yyyy-MM-dd_HHmm");
+        File dataDir = new File("data_" + dateFormatter.format(new Date()));
         try {
             if (dataDir.exists())
                 FileUtils.cleanDirectory(dataDir);
@@ -185,7 +197,7 @@ public class main {
         ENABLE(RaspiBcmPin.GPIO_11, PinMode.DIGITAL_OUTPUT),
         VALID(RaspiBcmPin.GPIO_08, PinMode.DIGITAL_INPUT),
         EMPTY(RaspiBcmPin.GPIO_09, PinMode.DIGITAL_INPUT),
-        CLOCK(RaspiBcmPin.GPIO_19, PinMode.DIGITAL_OUTPUT),
+        CLK(RaspiBcmPin.GPIO_02, PinMode.DIGITAL_OUTPUT),
 
         TUBELEVEL_0(RaspiBcmPin.GPIO_18, PinMode.DIGITAL_INPUT),
         TUBELEVEL_1(RaspiBcmPin.GPIO_23, PinMode.DIGITAL_INPUT),
