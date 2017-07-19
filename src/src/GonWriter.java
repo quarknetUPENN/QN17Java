@@ -48,6 +48,7 @@ public class GonWriter implements Runnable {
         gonLine += binaryDecode(Arrays.copyOfRange(tubeStates,0,4)); //tube level
         gonLine += tubeStates[4] ? "B" : "A";                                  //tube sublevel
         gonLine += binaryDecode(Arrays.copyOfRange(tubeStates,5,8)); //tube number
+        //gonLine += Arrays.toString(Arrays.copyOfRange(tubeStates,0,8));
         gonLine += ";";                                                        //.gon seperator
         gonLine += binaryDecode(Arrays.copyOfRange(tubeStates,8,16));//tube radius in clock pulses
         gonLine += "\n";

@@ -4,6 +4,7 @@ import org.apache.commons.io.FileUtils;
 import java.io.File;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Date;
 
 import static com.pi4j.io.gpio.PinState.LOW;
@@ -28,7 +29,7 @@ public class main {
 
         //initialize rd pins with the FPGA
         FpgaPin.ENABLE.setState(HIGH);
-        FpgaPin.CLK.setState(HIGH); //should this pulse instead?
+        FpgaPin.CLK.setState(LOW); //should this pulse instead?
 
 
 
@@ -50,39 +51,39 @@ public class main {
                  Log.v(TAG, "Enter first while loop");
                     //this is filled with data from one event, ie, 32 tubes
                     //each sublist is one tube
-                    boolean[][] eventTubeStates = new boolean[33][16];
+                    boolean[][] eventTubeStates = new boolean[32][16];
 
                     //a counter variable for each event.  it counts the number of tubes that have passed
                     int tubeCounter = 0;
+                    boolean[] currentInput;
 
                     //if there is data, go get it
 
                     System.out.println(FpgaPin.EMPTY.getState());
                     if (FpgaPin.EMPTY.getState() == LOW) {
-                        Log.v(TAG, "Going to read data");
+                        //Log.v(TAG, "Going to read data");
                         //keep reading tubes until there are no more tubes, or you run out for some reason
                         try {
-                            while ((!isStopFlag()) || (FpgaPin.EMPTY.getState() == LOW)) {
-                                //cycle the clock for a moment.  note that this assumes it takes 0 time to record data
-                                //what happens FPGA-side if something is interrupted for some reason over here?
+                            while (FpgaPin.EMPTY.getState() == LOW) {
                                 FpgaPin.CLK.setState(HIGH);
-                                Log.v(TAG, "Clock is now "+ FpgaPin.CLK.getState());
+                                Thread.sleep(10, 1);
 
-                                Thread.sleep(0, 1);
+                                //Log.v(TAG, "Clock is now "+ FpgaPin.CLK.getState());
+
                                 FpgaPin.CLK.setState(LOW);
-                                Log.v(TAG, "Clock is now "+ FpgaPin.CLK.getState());
+                                //Log.v(TAG, "Clock is now "+ FpgaPin.CLK.getState());
 
-                                Thread.sleep(0, 1);
-                                //wait for the valid pin to go high from the FPGA, ensuring there is new data on the bus
-                                //while ((FpgaPin.VALID.getState() == LOW)) ;
-
+                                Thread.sleep(10, 1);
                                 //record the data for the tube into eventTubeStates
-                                //while (tubeCounter < 33){
                                 try {
-                                    eventTubeStates[tubeCounter] = recordCurrentInputs();
-                                    Log.v(TAG, "Writing inputs...");
+                                    currentInput = recordCurrentInputs();
+                                    if(!isStopFlag(currentInput))
+                                        eventTubeStates[tubeCounter] = currentInput;
+                                    else
+                                        break;
+                                    //Log.v(TAG, "Writing inputs..." + Arrays.toString(eventTubeStates[tubeCounter]));
                                 } catch (ArrayIndexOutOfBoundsException e) {
-                                    Log.w(TAG, "Stop flag not encountered on 33rd event; will move on to next file");
+                                    Log.w(TAG, "Stop flag not encountered on 33rd data point; will move on to next file");
                                     break;
                                 }
 
@@ -130,14 +131,15 @@ public class main {
      *
      * @return whether or not the FPGA is currently sending a stop flag
      */
-    static boolean isStopFlag() {
+    static boolean isStopFlag(boolean[] inputs) {
 
         boolean isStop = true;
         //iterate through every current pin.  if they are all high, then return true
-        for(boolean pin : recordCurrentInputs()){
+        for(boolean pin : inputs){
             isStop = isStop && pin;
         }
-        Log.v(TAG,"Stop flag reached");
+        //if(isStop)
+            //Log.v(TAG,"Stop flag reached");
         return isStop;
     }
 
