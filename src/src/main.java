@@ -17,10 +17,7 @@ public class main {
     final static String TAG = main.class.getSimpleName();
 
     public static void main(String[] args) {
-        //make pi4j use the new version of wiringPi on the RPi
-        //instead of the old statically linked version
-        System.setProperty("pi4j.linking", "dynamic");
-
+        initGpio();
 
         //initialize rd pins with the FPGA
         FpgaPin.ENABLE.setHigh();
@@ -112,6 +109,20 @@ public class main {
         pinRecorder.interrupt();
     }
 
+    static void initGpio(){
+        //make pi4j use the new version of wiringPi on the RPi
+        //instead of the old statically linked version
+        System.setProperty("pi4j.linking", "dynamic");
+
+        //setup wiringpi to use BCM
+        if (com.pi4j.wiringpi.Gpio.wiringPiSetupGpio() == -1) {
+            Log.e(TAG, "FATAL: failed to set up GPIO");
+            throw new GpioInitializationException();
+        }
+        else
+            Log.i(TAG,"Successfully set up GPIO");
+    }
+
     /**
      * Detects if the FPGA is sending a stop flag with all bits high, indicating the end of the event (all
      * data for each tube has been sent)
@@ -183,10 +194,10 @@ public class main {
      * pin as appropriate
      */
     enum FpgaPin {
-        ENABLE      (11,        GpioUtil.DIRECTION_OUT),
+        ENABLE      (2,         GpioUtil.DIRECTION_OUT),
         VALID       (8,         GpioUtil.DIRECTION_IN),
         EMPTY       (9,         GpioUtil.DIRECTION_IN),
-        CLK         (2,         GpioUtil.DIRECTION_OUT),
+        CLK         (11,        GpioUtil.DIRECTION_OUT),
 
         TUBELEVEL_0 (18,        GpioUtil.DIRECTION_IN),
         TUBELEVEL_1 (23,        GpioUtil.DIRECTION_IN),
@@ -210,12 +221,6 @@ public class main {
         private int direction;
 
 
-
-        //use BCM numbering
-        static {
-            if (com.pi4j.wiringpi.Gpio.wiringPiSetupGpio() == -1)
-                Log.e(TAG,"Failed to set up GPIO");
-        }
 
         FpgaPin(int pinCode, int direction) {
             this.pinCode = pinCode;
