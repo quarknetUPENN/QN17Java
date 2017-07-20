@@ -1,10 +1,11 @@
 import com.pi4j.io.gpio.*;
+import com.pi4j.wiringpi.Gpio;
+import com.pi4j.wiringpi.GpioUtil;
 import org.apache.commons.io.FileUtils;
 
 import java.io.File;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
-import java.util.Arrays;
 import java.util.Date;
 
 import static com.pi4j.io.gpio.PinState.LOW;
@@ -24,31 +25,29 @@ public class main {
         //instead of the old statically linked version
         System.setProperty("pi4j.linking", "dynamic");
 
-        //make sure that the BCM numbering is used; RaspiBcmPin isn't enough
-        GpioFactory.setDefaultProvider(new RaspiGpioProvider(RaspiPinNumberingScheme.BROADCOM_PIN_NUMBERING));
 
         //initialize rd pins with the FPGA
-        FpgaPin.ENABLE.setState(HIGH);
-        FpgaPin.CLK.setState(LOW); //should this pulse instead?
-
+        FpgaPin.ENABLE.setHigh();
+        FpgaPin.CLK.setLow();
 
 
         //create the directory to store all the data from this run in
         final File dataDir = createTimeStampedDataDir();
-        if(dataDir == null)
+        if(dataDir == null){
+            Log.e(TAG,"FATAL: Could not make data directory");
             return;
+        }
 
         //create a new thread to handle receiving all the data and sending it to GonWriters to record
         Thread pinRecorder = new Thread(new Runnable() {
             @Override
             public void run() {
-                Log.v(TAG, "Enter thread");
+                Log.v(TAG, "Pin recorder thread started");
                 //counts how many events have been received
                 int eventN = 1;
+
                 //if we are not asked to stop, keep reading data
-                while (!Thread.interrupted())
-                {
-                 Log.v(TAG, "Enter first while loop");
+                while (!Thread.interrupted()) {
                     //this is filled with data from one event, ie, 32 tubes
                     //each sublist is one tube
                     boolean[][] eventTubeStates = new boolean[32][16];
@@ -58,30 +57,26 @@ public class main {
                     boolean[] currentInput;
 
                     //if there is data, go get it
-
-                    System.out.println(FpgaPin.EMPTY.getState());
-                    if (FpgaPin.EMPTY.getState() == LOW) {
+                    if (FpgaPin.EMPTY.isLow()) {
                         //Log.v(TAG, "Going to read data");
                         //keep reading tubes until there are no more tubes, or you run out for some reason
                         try {
-                            while (FpgaPin.EMPTY.getState() == LOW) {
-                                FpgaPin.CLK.setState(HIGH);
+                            while (FpgaPin.EMPTY.isLow()) {
+                                //pulse the clock
+                                FpgaPin.CLK.setHigh();
+                                Thread.sleep(10, 1);
+                                FpgaPin.CLK.setLow();
                                 Thread.sleep(10, 1);
 
-                                //Log.v(TAG, "Clock is now "+ FpgaPin.CLK.getState());
-
-                                FpgaPin.CLK.setState(LOW);
-                                //Log.v(TAG, "Clock is now "+ FpgaPin.CLK.getState());
-
-                                Thread.sleep(10, 1);
                                 //record the data for the tube into eventTubeStates
                                 try {
                                     currentInput = recordCurrentInputs();
-                                    if(!isStopFlag(currentInput))
-                                        eventTubeStates[tubeCounter] = currentInput;
-                                    else
+                                    //stop if we are supposed to, otherwise, add the tube to the array
+                                    if(isStopFlag(currentInput)) {
                                         break;
-                                    //Log.v(TAG, "Writing inputs..." + Arrays.toString(eventTubeStates[tubeCounter]));
+                                    } else {
+                                        eventTubeStates[tubeCounter] = currentInput;
+                                    }
                                 } catch (ArrayIndexOutOfBoundsException e) {
                                     Log.w(TAG, "Stop flag not encountered on 33rd data point; will move on to next file");
                                     break;
@@ -89,23 +84,19 @@ public class main {
 
                                 tubeCounter++;
                             }
-                        }
-
-                        catch (InterruptedException e) {
+                        } catch (InterruptedException e) {
                             Log.e(TAG, "Reading thread interrupted while waiting; terminating read thread", e);
                             break;
                         }
                         //send the event data over to a GonWriter to have it recorded to a file
                         new Thread(new GonWriter(new File(dataDir, "event" + Integer.toString(eventN) + ".gon"), eventTubeStates)).start();
                         eventN++;
-                    }
-                     else {
-                        Log.i(TAG, "No data to get, TubeSubLevel is "+FpgaPin.TUBESUBLEVEL.getState().getName());
+                    } else {
+                        Log.i(TAG, "No data to get");
                         try {
                             Thread.sleep(10);
-                        }
-                        catch(InterruptedException e){
-                            e.printStackTrace();
+                        } catch(InterruptedException e){
+                            Log.i(TAG,"Interrupted while waiting for data");
                         }
                     }
 
@@ -138,8 +129,8 @@ public class main {
         for(boolean pin : inputs){
             isStop = isStop && pin;
         }
-        //if(isStop)
-            //Log.v(TAG,"Stop flag reached");
+        if(isStop)
+            Log.v(TAG,"Stop flag reached");
         return isStop;
     }
 
@@ -149,22 +140,22 @@ public class main {
      */
     static boolean[] recordCurrentInputs(){
         return new boolean[]{
-                FpgaPin.TUBELEVEL_0.getState()  ==     HIGH,
-                FpgaPin.TUBELEVEL_1.getState()  ==     HIGH,
-                FpgaPin.TUBELEVEL_2.getState()  ==     HIGH,
-                FpgaPin.TUBELEVEL_3.getState()  ==     HIGH,
-                FpgaPin.TUBESUBLEVEL.getState() ==     HIGH,
-                FpgaPin.TUBENUM_0.getState()    ==     HIGH,
-                FpgaPin.TUBENUM_1.getState()    ==     HIGH,
-                FpgaPin.TUBENUM_2.getState()    ==     HIGH,
-                FpgaPin.RAD_0.getState()        ==     HIGH,
-                FpgaPin.RAD_1.getState()        ==     HIGH,
-                FpgaPin.RAD_2.getState()        ==     HIGH,
-                FpgaPin.RAD_3.getState()        ==     HIGH,
-                FpgaPin.RAD_4.getState()        ==     HIGH,
-                FpgaPin.RAD_5.getState()        ==     HIGH,
-                FpgaPin.RAD_6.getState()        ==     HIGH,
-                FpgaPin.RAD_7.getState()        ==     HIGH};
+                FpgaPin.TUBELEVEL_0.getState(),
+                FpgaPin.TUBELEVEL_1.getState(),
+                FpgaPin.TUBELEVEL_2.getState(),
+                FpgaPin.TUBELEVEL_3.getState(),
+                FpgaPin.TUBESUBLEVEL.getState(),
+                FpgaPin.TUBENUM_0.getState(),
+                FpgaPin.TUBENUM_1.getState(),
+                FpgaPin.TUBENUM_2.getState(),
+                FpgaPin.RAD_0.getState(),
+                FpgaPin.RAD_1.getState(),
+                FpgaPin.RAD_2.getState(),
+                FpgaPin.RAD_3.getState(),
+                FpgaPin.RAD_4.getState(),
+                FpgaPin.RAD_5.getState(),
+                FpgaPin.RAD_6.getState(),
+                FpgaPin.RAD_7.getState()};
     }
 
 
@@ -192,184 +183,102 @@ public class main {
 
     /**
      * Enumerates every pin that connects to the FPGA, and contains some basic methods
-     * Includes the RPi pin, the pin mode, and some basic get/set functions for each
+     * Includes the RPi pin, the pin direction, and some basic get/set functions for each
      * pin as appropriate
      */
     enum FpgaPin {
-        ENABLE(RaspiBcmPin.GPIO_11, PinMode.DIGITAL_OUTPUT),
-        VALID(RaspiBcmPin.GPIO_08, PinMode.DIGITAL_INPUT),
-        EMPTY(RaspiBcmPin.GPIO_09, PinMode.DIGITAL_INPUT),
-        CLK(RaspiBcmPin.GPIO_02, PinMode.DIGITAL_OUTPUT),
+        ENABLE      (11,     GpioUtil.DIRECTION_OUT),
+        VALID       (8,      GpioUtil.DIRECTION_IN),
+        EMPTY       (9,      GpioUtil.DIRECTION_IN),
+        CLK         (2,      GpioUtil.DIRECTION_OUT),
 
-        TUBELEVEL_0(RaspiBcmPin.GPIO_18, PinMode.DIGITAL_INPUT),
-        TUBELEVEL_1(RaspiBcmPin.GPIO_23, PinMode.DIGITAL_INPUT),
-        TUBELEVEL_2(RaspiBcmPin.GPIO_24, PinMode.DIGITAL_INPUT),
-        TUBELEVEL_3(RaspiBcmPin.GPIO_25, PinMode.DIGITAL_INPUT),
-        TUBESUBLEVEL(RaspiBcmPin.GPIO_07, PinMode.DIGITAL_INPUT),
-        TUBENUM_0(RaspiBcmPin.GPIO_16, PinMode.DIGITAL_INPUT),
-        TUBENUM_1(RaspiBcmPin.GPIO_20, PinMode.DIGITAL_INPUT),
-        TUBENUM_2(RaspiBcmPin.GPIO_21, PinMode.DIGITAL_INPUT),
+        TUBELEVEL_0 (18,     GpioUtil.DIRECTION_IN),
+        TUBELEVEL_1 (23,     GpioUtil.DIRECTION_IN),
+        TUBELEVEL_2 (24,     GpioUtil.DIRECTION_IN),
+        TUBELEVEL_3 (25,     GpioUtil.DIRECTION_IN),
+        TUBESUBLEVEL(7,      GpioUtil.DIRECTION_IN),
+        TUBENUM_0   (16,     GpioUtil.DIRECTION_IN),
+        TUBENUM_1   (20,     GpioUtil.DIRECTION_IN),
+        TUBENUM_2   (21,     GpioUtil.DIRECTION_IN),
 
-        RAD_0(RaspiBcmPin.GPIO_26, PinMode.DIGITAL_INPUT),
-        RAD_1(RaspiBcmPin.GPIO_13, PinMode.DIGITAL_INPUT),
-        RAD_2(RaspiBcmPin.GPIO_05, PinMode.DIGITAL_INPUT),
-        RAD_3(RaspiBcmPin.GPIO_10, PinMode.DIGITAL_INPUT),
-        RAD_4(RaspiBcmPin.GPIO_04, PinMode.DIGITAL_INPUT),
-        RAD_5(RaspiBcmPin.GPIO_17, PinMode.DIGITAL_INPUT),
-        RAD_6(RaspiBcmPin.GPIO_27, PinMode.DIGITAL_INPUT),
-        RAD_7(RaspiBcmPin.GPIO_22, PinMode.DIGITAL_INPUT);
+        RAD_0       (26,     GpioUtil.DIRECTION_IN),
+        RAD_1       (13,     GpioUtil.DIRECTION_IN),
+        RAD_2       (5,      GpioUtil.DIRECTION_IN),
+        RAD_3       (10,     GpioUtil.DIRECTION_IN),
+        RAD_4       (4,      GpioUtil.DIRECTION_IN),
+        RAD_5       (17,     GpioUtil.DIRECTION_IN),
+        RAD_6       (27,     GpioUtil.DIRECTION_IN),
+        RAD_7       (22,     GpioUtil.DIRECTION_IN);
 
-        private Pin pinCode;
-        private PinMode mode;
-
-        private String badModeWarn;
-
-        private GpioPin pin;
+        private int pinCode;
+        private int direction;
 
 
-        FpgaPin(Pin pinCode, PinMode mode) {
+        //use BCM numbering
+        static {
+            if (com.pi4j.wiringpi.Gpio.wiringPiSetupGpio() == -1)
+                Log.e(TAG,"Failed to set up GPIO");
+        }
+
+        FpgaPin(int pinCode, int direction) {
             this.pinCode = pinCode;
-            this.mode = mode;
-
-            badModeWarn = "Pin " + pinCode.getName() + " not configured as digital I/O" +
-                    " instead configured as " + mode.getName() + " and will not function";
-            GpioFactory.setDefaultProvider(new RaspiGpioProvider(RaspiPinNumberingScheme.BROADCOM_PIN_NUMBERING));
+            this.direction = direction;
 
             //provision the pin as either input or output
-            switch (mode) {
-                case DIGITAL_INPUT:
-                    pin = GpioFactory.getInstance().provisionDigitalInputPin(pinCode);
-                    break;
-                case DIGITAL_OUTPUT:
-                    pin = GpioFactory.getInstance().provisionDigitalOutputPin(pinCode);
-                    break;
-                case PWM_OUTPUT:
-                    pin = GpioFactory.getInstance().provisionPwmOutputPin(pinCode);
-                    break;
-                default:
-                    Log.w(TAG, badModeWarn);
-                    break;
-            }
+            GpioUtil.export(pinCode,direction);
         }
 
 
         /**
-         * Sets the current state of the pin if it is a DIGITAL_OUTPUT pin
+         * Sets the current state of the pin to a given value
          *
-         * @param state the state to set the pin to; low or high
+         * @param state the state to set the pin to; false for low, true for high
          */
-        public void setState(PinState state) {
-            switch (mode) {
-                case DIGITAL_INPUT:
-                case PWM_OUTPUT:
-                    Log.w(TAG, "Attempted state set on pin " + pinCode.getName() + " not configured as digital output" +
-                            " instead configured as " + mode.getName() + ".  Will ignore instruction");
-                    break;
-                case DIGITAL_OUTPUT:
-                    ((GpioPinDigitalOutput) pin).setState(state);
-                    break;
-                default:
-                    Log.w(TAG, badModeWarn);
-            }
+        public void setState(boolean state) {
+            Gpio.digitalWrite(pinCode,state);
         }
 
 
         /**
          * Gets the current pin state, unless the pin is not digital I/O, then returns null
          *
-         * @return the current pin state
+         * @return the current pin state; true if high, false if low
          */
-        public PinState getState() {
-            switch (mode) {
-                case DIGITAL_INPUT:
-                case DIGITAL_OUTPUT:
-                    return ((GpioPinDigital) pin).getState();
-                case PWM_OUTPUT:
-                    Log.w(TAG, "Attempted state set on pin " + pinCode.getName() + " not configured as digital output" +
-                            " instead configured as " + mode.getName() + ".  Will ignore instruction");
-                    return null;
-                default:
-                    Log.w(TAG, badModeWarn);
-                    return null;
-            }
+        public boolean getState() {
+            return Gpio.digitalRead(pinCode) == 1;
+        }
+
+        public boolean isHigh() {
+            return getState();
+        }
+
+        public boolean isLow() {
+            return !getState();
+        }
+
+        public void setLow(){
+            setState(false);
+        }
+
+        public void setHigh(){
+            setState(true);
         }
 
         /**
          * Logs the current state of the pin in the terminal
          */
         public void logState(){
-            if(getState() == null)
-                Log.v(TAG,"Null value for pin state, invalid pin configuration");
-            else
-                Log.v(TAG,pinCode.getName()+" is currently "+getState().getName()+" at nanotime "+Long.toString(System.nanoTime()));
+            Log.v(TAG,"Pin "+pinCode+" is currently "+getState()+" at nanotime "+Long.toString(System.nanoTime()));
         }
 
-        public void setPwm(int freq){
-            switch(mode)
-            {
-                case DIGITAL_INPUT:
-                case DIGITAL_OUTPUT:
-                    Log.w(TAG,"Attempted PWM set on pin " + pinCode.getName() + " not configured as digital output" +
-                            " instead configured as " + mode.getName() + ".  Will ignore instruction");
-                    break;
-                case PWM_OUTPUT:
-                    ((GpioPinPwmOutput) pin).setPwm(512);
-                    break;
-                default:
-                    Log.w(TAG,badModeWarn);
-                    break;
-            }
-        }
-
-
-        public int getPwm(){
-            switch(mode)
-            {
-                case DIGITAL_INPUT:
-                case DIGITAL_OUTPUT:
-                    Log.w(TAG,"Attempted PWM get on pin " + pinCode.getName() + " not configured as digital output" +
-                            " instead configured as " + mode.getName() + ".  Will return 0");
-                    return 0;
-                case PWM_OUTPUT:
-                    return ((GpioPinPwmOutput) pin).getPwm();
-                default:
-                    Log.w(TAG,badModeWarn);
-                    return 0;
-            }
-        }
 
         /**
-         * Gets the current pin object  If not digital I/O, returns null
+         * Gets the current pin direction
          *
-         * @return the digital pin object
+         * @return the direction of the current pin encoded as an int; see GpioUtils from wiringPi to decode it
          */
-        public GpioPin getPin() {
-            switch (mode) {
-                case DIGITAL_INPUT:
-                case DIGITAL_OUTPUT:
-                case PWM_OUTPUT:
-                    return pin;
-                default:
-                    Log.w(TAG, badModeWarn);
-                    return null;
-            }
-        }
-
-        /**
-         * Gets the current pin mode.  If not digital I/O, returns null
-         *
-         * @return the mode of the current pin; either DIGITAL_INPUT or DIGITAL_OUTPUT
-         */
-        public PinMode getMode() {
-            switch (mode) {
-                case DIGITAL_INPUT:
-                case DIGITAL_OUTPUT:
-                case PWM_OUTPUT:
-                    return mode;
-                default:
-                    Log.w(TAG, badModeWarn);
-                    return null;
-            }
+        public int getDirection() {
+            return direction;
         }
     }
 }
