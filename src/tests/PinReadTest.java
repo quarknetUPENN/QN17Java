@@ -10,7 +10,8 @@ public class PinReadTest {
         Thread pinReadThread = new Thread(new Runnable() {
             @Override
             public void run() {
-                while(!Thread.interrupted())
+                Log.i(TAG,""+RpiPinReader.readPins());
+/*                while(!Thread.interrupted())
                 {
                     main.FpgaPin.ENABLE.logState();
                     main.FpgaPin.VALID.logState();
@@ -32,7 +33,7 @@ public class PinReadTest {
                     main.FpgaPin.RAD_5.logState();
                     main.FpgaPin.RAD_6.logState();
                     main.FpgaPin.RAD_7.logState();
-                }
+                }*/
             }
         });
 

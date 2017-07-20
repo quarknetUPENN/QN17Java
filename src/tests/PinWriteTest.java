@@ -1,4 +1,6 @@
-import java.io.IOException;
+import org.apache.commons.io.FileUtils;
+
+import java.io.*;
 
 import static com.pi4j.io.gpio.PinState.HIGH;
 import static com.pi4j.io.gpio.PinState.LOW;
@@ -15,26 +17,10 @@ public class PinWriteTest {
         Thread thread = new Thread(new Runnable() {
             @Override
             public void run() {
-                try {
-                    while (!Thread.interrupted()) {
-                        main.FpgaPin.CLK.setHigh();
-                        main.FpgaPin.ENABLE.setHigh();
-                        //Speed of 2 microseconds per pulse
-                        Thread.sleep(1, 0);
-                        System.out.println("Clock is now "+ main.FpgaPin.CLK.getState());
-                        System.out.println("Enable is now "+ main.FpgaPin.ENABLE.getState());
-                        main.FpgaPin.CLK.setLow();
-                        main.FpgaPin.ENABLE.setLow();
-                        Log.v(TAG, "Clock set low...");
-                        Thread.sleep(1, 0);
-                        System.out.println("Clock is now "+ main.FpgaPin.CLK.getState());
-                        System.out.println("Enable is now "+ main.FpgaPin.ENABLE.getState());
-
-                    }
-                } catch (InterruptedException e){
-                    Log.e(TAG,"interrupted while pulsing clock, stopping",e);
+                while(!Thread.interrupted()) {
+                    main.FpgaPin.ENABLE.setState(true);
+                    main.FpgaPin.ENABLE.setState(false);
                 }
-
                 Log.i(TAG,"Stopping clock pulsing thread");
             }
         });

@@ -2,8 +2,7 @@ import com.pi4j.wiringpi.Gpio;
 import com.pi4j.wiringpi.GpioUtil;
 import org.apache.commons.io.FileUtils;
 
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
@@ -114,6 +113,12 @@ public class main {
         //instead of the old statically linked version
         System.setProperty("pi4j.linking", "dynamic");
 
+/*        try{
+            Runtime.getRuntime().exec("sudo ./setup.sh");
+        } catch (IOException e) {
+            Log.e(TAG,"Could not export pins, the thing might not work",e);
+        }*/
+
         //setup wiringpi to use BCM
         if (com.pi4j.wiringpi.Gpio.wiringPiSetupGpio() == -1) {
             Log.e(TAG, "FATAL: failed to set up GPIO");
@@ -219,15 +224,28 @@ public class main {
 
         private int pinCode;
         private int direction;
-
+        private Writer writer;
+        private RandomAccessFile file;
 
 
         FpgaPin(int pinCode, int direction) {
             this.pinCode = pinCode;
             this.direction = direction;
 
-            //provision the pin as either input or output
-            GpioUtil.export(pinCode,direction);
+            if(direction == GpioUtil.DIRECTION_OUT){
+                try {
+                    writer = new OutputStreamWriter(new FileOutputStream("/sys/class/gpio/gpio"+pinCode+"/value"));
+                } catch (FileNotFoundException e){
+                    Log.e(TAG, "Pin "+pinCode+" not exported, try running setup.sh",e);
+                }
+            }
+            if(direction == GpioUtil.DIRECTION_IN){
+                try{
+                    file = new RandomAccessFile("/sys/class/gpio/gpio"+pinCode+"/value","r");
+                } catch (FileNotFoundException e) {
+                    Log.e(TAG, "Pin "+pinCode+" not exported, try running setup.sh",e);
+                }
+            }
         }
 
 
@@ -237,7 +255,17 @@ public class main {
          * @param state the state to set the pin to; false for low, true for high
          */
         public void setState(boolean state) {
-            Gpio.digitalWrite(pinCode,state);
+            if(direction == GpioUtil.DIRECTION_OUT){
+                try {
+                    if(state)
+                        writer.write("1\n");
+                    else
+                        writer.write("0\n");
+                    writer.flush();
+                } catch (IOException e) {
+                    Log.e(TAG, "IO Exception while writing to file :( ", e);
+                }
+            }
         }
 
 
@@ -247,7 +275,13 @@ public class main {
          * @return the current pin state; true if high, false if low
          */
         public boolean getState() {
-            return Gpio.digitalRead(pinCode) == 1;
+            try {
+                file.seek(0);
+                return file.readLine().equals("1");
+            } catch (IOException e) {
+                Log.e(TAG,"Could not read from pin "+pinCode+" did you export the pin with setup.sh?",e);
+            }
+            return false;
         }
 
         public boolean isHigh() {
