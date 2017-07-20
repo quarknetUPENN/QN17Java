@@ -1,4 +1,3 @@
-import com.pi4j.io.gpio.*;
 import com.pi4j.wiringpi.Gpio;
 import com.pi4j.wiringpi.GpioUtil;
 import org.apache.commons.io.FileUtils;
@@ -7,9 +6,6 @@ import java.io.File;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-
-import static com.pi4j.io.gpio.PinState.LOW;
-import static com.pi4j.io.gpio.PinState.HIGH;
 
 
 /**
@@ -187,31 +183,32 @@ public class main {
      * pin as appropriate
      */
     enum FpgaPin {
-        ENABLE      (11,     GpioUtil.DIRECTION_OUT),
-        VALID       (8,      GpioUtil.DIRECTION_IN),
-        EMPTY       (9,      GpioUtil.DIRECTION_IN),
-        CLK         (2,      GpioUtil.DIRECTION_OUT),
+        ENABLE      (11,        GpioUtil.DIRECTION_OUT),
+        VALID       (8,         GpioUtil.DIRECTION_IN),
+        EMPTY       (9,         GpioUtil.DIRECTION_IN),
+        CLK         (2,         GpioUtil.DIRECTION_OUT),
 
-        TUBELEVEL_0 (18,     GpioUtil.DIRECTION_IN),
-        TUBELEVEL_1 (23,     GpioUtil.DIRECTION_IN),
-        TUBELEVEL_2 (24,     GpioUtil.DIRECTION_IN),
-        TUBELEVEL_3 (25,     GpioUtil.DIRECTION_IN),
-        TUBESUBLEVEL(7,      GpioUtil.DIRECTION_IN),
-        TUBENUM_0   (16,     GpioUtil.DIRECTION_IN),
-        TUBENUM_1   (20,     GpioUtil.DIRECTION_IN),
-        TUBENUM_2   (21,     GpioUtil.DIRECTION_IN),
+        TUBELEVEL_0 (18,        GpioUtil.DIRECTION_IN),
+        TUBELEVEL_1 (23,        GpioUtil.DIRECTION_IN),
+        TUBELEVEL_2 (24,        GpioUtil.DIRECTION_IN),
+        TUBELEVEL_3 (25,        GpioUtil.DIRECTION_IN),
+        TUBESUBLEVEL(7,         GpioUtil.DIRECTION_IN),
+        TUBENUM_0   (16,        GpioUtil.DIRECTION_IN),
+        TUBENUM_1   (20,        GpioUtil.DIRECTION_IN),
+        TUBENUM_2   (21,        GpioUtil.DIRECTION_IN),
 
-        RAD_0       (26,     GpioUtil.DIRECTION_IN),
-        RAD_1       (13,     GpioUtil.DIRECTION_IN),
-        RAD_2       (5,      GpioUtil.DIRECTION_IN),
-        RAD_3       (10,     GpioUtil.DIRECTION_IN),
-        RAD_4       (4,      GpioUtil.DIRECTION_IN),
-        RAD_5       (17,     GpioUtil.DIRECTION_IN),
-        RAD_6       (27,     GpioUtil.DIRECTION_IN),
-        RAD_7       (22,     GpioUtil.DIRECTION_IN);
+        RAD_0       (26,        GpioUtil.DIRECTION_IN),
+        RAD_1       (13,        GpioUtil.DIRECTION_IN),
+        RAD_2       (5,         GpioUtil.DIRECTION_IN),
+        RAD_3       (10,        GpioUtil.DIRECTION_IN),
+        RAD_4       (4,         GpioUtil.DIRECTION_IN),
+        RAD_5       (17,        GpioUtil.DIRECTION_IN),
+        RAD_6       (27,        GpioUtil.DIRECTION_IN),
+        RAD_7       (22,        GpioUtil.DIRECTION_IN);
 
         private int pinCode;
         private int direction;
+
 
 
         //use BCM numbering

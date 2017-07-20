@@ -19,12 +19,12 @@ public class PinWriteTest {
             public void run() {
                 //try {
                     while (!Thread.interrupted()) {
-                        main.FpgaPin.CLK.setState(HIGH);
+                        main.FpgaPin.CLK.setHigh();
                         //Speed of 2 microseconds per pulse
                         //Thread.sleep(0, 0);
                         //System.out.println("Clock is now "+ main.FpgaPin.CLK.getState());
                         //System.out.println("Enable is now "+ main.FpgaPin.ENABLE.getState());
-                        main.FpgaPin.CLK.setState(LOW);
+                        main.FpgaPin.CLK.setLow();
                         //Thread.sleep(0, 0);
                         //System.out.println("Clock is now "+ main.FpgaPin.CLK.getState());
                         //System.out.println("Enable is now "+ main.FpgaPin.ENABLE.getState());
@@ -48,7 +48,6 @@ public class PinWriteTest {
         thread.interrupt();
         // For some reason, the following line breaks the code
         //      ((GpioPinDigitalOutput)main.FpgaPin.CLK.getPin()).toggle();
-        Log.i(TAG,main.FpgaPin.CLK.getState().getName());
         try {
             Thread.sleep(1000, 0);
         } catch (InterruptedException e) {
