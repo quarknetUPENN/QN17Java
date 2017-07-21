@@ -14,7 +14,7 @@ public class PinReadTest {
                 boolean[] result = new boolean[16];
 
                 //Calls the C function to read each pin
-                String unpadded = Integer.toBinaryString(RpiPinReader.readPins());
+                String unpadded = Integer.toBinaryString(1);
 
                 //Pad the leading edge of this int with zeroes until it's 16 characters long
                 while(unpadded.length() <= 15)
