@@ -1,4 +1,5 @@
 import java.io.IOException;
+import java.util.Arrays;
 
 /**
  * A class that tests the pin reading by logging the states of all the pins
@@ -10,7 +11,7 @@ public class PinReadTest {
         Thread pinReadThread = new Thread(new Runnable() {
             @Override
             public void run() {
-                Log.i(TAG,""+RpiPinReader.readPins());
+                Log.i(TAG,""+ Arrays.toString(RpiPinReader.readDecodePins()));
 /*                while(!Thread.interrupted())
                 {
                     main.FpgaPin.ENABLE.logState();

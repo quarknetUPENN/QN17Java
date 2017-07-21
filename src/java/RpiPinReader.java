@@ -1,19 +1,29 @@
-import com.pi4j.util.NativeLibraryLoader;
-
 import java.nio.file.Paths;
 
 /**
  * Created by root on 7/20/17.
  */
 public class RpiPinReader {
+    final static String TAG = RpiPinReader.class.getSimpleName();
+
     static {
         //load the compiled c code by absolute path.  first get absolute path to working dir, then go into the libs
         //folder and get the appropriate .so file
-        //TODO:Slightly different on Raspbian vs Windows?
         System.load(Paths.get("").toAbsolutePath().toString()+"/lib/librpipinreader.so");
     }
 
-    public native static int readPins();
+    native static int readPins();
+
+    static boolean[] readDecodePins(){
+        boolean[] result = new boolean[16];
+        String data = Integer.toBinaryString(RpiPinReader.readPins());
+
+        Log.v(TAG,"Read string: "+data);
+        for (int i = 0; i <= 15; i++) {
+            result[i] = data.charAt(i) == '1';
+        }
+        return result;
+    }
 }
 
 //compile the java file by generating .class file;

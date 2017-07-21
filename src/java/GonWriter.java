@@ -16,24 +16,21 @@ public class GonWriter implements Runnable {
     private boolean[][] eventTubeStates;
     private File targetWriteFile;
 
-    public GonWriter(File targetWriteFile, boolean[][] eventTubeStates){
-        this.eventTubeStates = eventTubeStates;
+    GonWriter(File targetWriteFile, boolean[][] eventTubeStates){
         this.targetWriteFile = targetWriteFile;
+        this.eventTubeStates = eventTubeStates;
     }
 
     @Override
     public void run() {
-
-
         //go through every tube in the received event array, and write them all to the specified file
         for(boolean[] tubeState : eventTubeStates)
         {
             //attempt to append on the tube currently being read into the gon file
             try {
-                Charset defaultCharset = null;
-                FileUtils.writeStringToFile(targetWriteFile,findGonLine(tubeState),defaultCharset,true);
+                FileUtils.writeStringToFile(targetWriteFile,findGonLine(tubeState),(Charset) null,true);
             } catch (IOException e) {
-                Log.e(TAG,"Failed to write line to gon file "+targetWriteFile.getPath()+" will leave incomplete file",e);
+                Log.e(TAG,"Failed to write line to gon file "+targetWriteFile.getPath()+" will skip this line",e);
             }
         }
     }
@@ -48,7 +45,6 @@ public class GonWriter implements Runnable {
         gonLine += binaryDecode(Arrays.copyOfRange(tubeStates,0,4)); //tube level
         gonLine += tubeStates[4] ? "B" : "A";                                  //tube sublevel
         gonLine += binaryDecode(Arrays.copyOfRange(tubeStates,5,8)); //tube number
-        //gonLine += Arrays.toString(Arrays.copyOfRange(tubeStates,0,8));
         gonLine += ";";                                                        //.gon seperator
         gonLine += binaryDecode(Arrays.copyOfRange(tubeStates,8,16));//tube radius in clock pulses
         gonLine += "\n";
@@ -64,8 +60,7 @@ public class GonWriter implements Runnable {
         int i = 1;
         int sum = 0;
         for(boolean b : bin){
-            if(b)
-                sum += i;
+            if(b) sum += i;
             i *= 2;
         }
         return sum;

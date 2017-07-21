@@ -1,4 +1,3 @@
-import com.pi4j.wiringpi.Gpio;
 import com.pi4j.wiringpi.GpioUtil;
 import org.apache.commons.io.FileUtils;
 
@@ -62,7 +61,9 @@ public class main {
 
                                 //record the data for the tube into eventTubeStates
                                 try {
-                                    currentInput = recordCurrentInputs();
+                                    //read the pins, returning an encoded int.  convert to binary string and then decode it
+                                    currentInput = RpiPinReader.readDecodePins();
+
                                     //stop if we are supposed to, otherwise, add the tube to the array
                                     if(isStopFlag(currentInput)) {
                                         break;
@@ -122,7 +123,7 @@ public class main {
         //setup wiringpi to use BCM
         if (com.pi4j.wiringpi.Gpio.wiringPiSetupGpio() == -1) {
             Log.e(TAG, "FATAL: failed to set up GPIO");
-            throw new GpioInitializationException();
+            throw new RuntimeException("WiringPi failed to properly set up GPIO for some reason.  Are you running as sudo?");
         }
         else
             Log.i(TAG,"Successfully set up GPIO");

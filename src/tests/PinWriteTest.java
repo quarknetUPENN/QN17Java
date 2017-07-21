@@ -1,9 +1,4 @@
-import org.apache.commons.io.FileUtils;
-
-import java.io.*;
-
-import static com.pi4j.io.gpio.PinState.HIGH;
-import static com.pi4j.io.gpio.PinState.LOW;
+import java.io.IOException;
 
 
 /**
@@ -31,6 +26,7 @@ public class PinWriteTest {
             System.in.read();
         } catch (IOException e) {
             Log.e(TAG, "Reading thread interrupted while waiting; terminating read thread", e);
+            return;
         }
         thread.interrupt();
         // For some reason, the following line breaks the code
@@ -39,7 +35,6 @@ public class PinWriteTest {
             Thread.sleep(1000, 0);
         } catch (InterruptedException e) {
             Log.e(TAG, "Reading thread interrupted while waiting; terminating read thread", e);
-            return;
         }
     }
 }
