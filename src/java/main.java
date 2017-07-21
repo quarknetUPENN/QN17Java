@@ -42,7 +42,7 @@ public class main {
                     //this is filled with data from one event, ie, 32 tubes
                     //each sublist is one tube
                     boolean[][] eventTubeStates = new boolean[32][16];
-
+                    boolean eventWriteFlag = false;
                     //a counter variable for each event.  it counts the number of tubes that have passed
                     int tubeCounter = 0;
                     boolean[] currentInput;
@@ -54,11 +54,19 @@ public class main {
                         try {
                             while (FpgaPin.EMPTY.isLow()) {
                                 //pulse the clock
+                                System.out.println(tubeCounter);
                                 FpgaPin.CLK.setHigh();
-                                Thread.sleep(10, 1);
-                                FpgaPin.CLK.setLow();
-                                Thread.sleep(10, 1);
-
+                                Log.v(TAG, "Waiting for valid pin, valid pin is " + FpgaPin.VALID.getState());
+                                for (int k = 0; k < 99; k++) {
+                                    if (FpgaPin.VALID.isHigh()) {
+                                        Thread.sleep(1, 0);
+                                    }
+                                    else{
+                                        break;
+                                    }
+                                }
+                                Log.v(TAG, "Valid pin is " + FpgaPin.VALID.getState() + ", now collecting data");
+                                Log.v(TAG, "Event write flag is " + eventWriteFlag);
                                 //record the data for the tube into eventTubeStates
                                 try {
                                     //read the pins, returning an encoded int.  convert to binary string and then decode it
@@ -69,12 +77,15 @@ public class main {
                                         break;
                                     } else {
                                         eventTubeStates[tubeCounter] = currentInput;
+                                        eventWriteFlag = true;
                                     }
                                 } catch (ArrayIndexOutOfBoundsException e) {
                                     Log.w(TAG, "Stop flag not encountered on 33rd data point; will move on to next file");
                                     break;
                                 }
 
+                                FpgaPin.CLK.setLow();
+                                Thread.sleep(1, 1);
                                 tubeCounter++;
                             }
                         } catch (InterruptedException e) {
@@ -82,8 +93,10 @@ public class main {
                             break;
                         }
                         //send the event data over to a GonWriter to have it recorded to a file
-                        new Thread(new GonWriter(new File(dataDir, "event" + Integer.toString(eventN) + ".gon"), eventTubeStates)).start();
-                        eventN++;
+                        if (eventWriteFlag) {
+                            new Thread(new GonWriter(new File(dataDir, "event" + Integer.toString(eventN) + ".gon"), eventTubeStates)).start();
+                            eventN++;
+                        }
                     } else {
                         Log.i(TAG, "No data to get");
                         try {

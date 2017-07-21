@@ -19,7 +19,7 @@ JNIEXPORT jint JNICALL Java_RpiPinReader_readPins(JNIEnv *env, jobject obj) {
     result += 2048  * digitalRead(10);
     result += 4096  * digitalRead(4 );
     result += 8192  * digitalRead(17);
-    result += 16394 * digitalRead(27);
+    result += 16384 * digitalRead(27);
     result += 32768 * digitalRead(22);
     return (jint) result;
 }
