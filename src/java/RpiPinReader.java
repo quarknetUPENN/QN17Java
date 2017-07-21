@@ -25,7 +25,7 @@ public class RpiPinReader {
         //Pad the leading edge of this int with zeroes until it's 16 characters long
         while(unpadded.length() <= 15)
             unpadded = "0" + unpadded; //Now padded (don't let the name mislead you)
-        Log.v(TAG, "Unpadded (this is backwards): " + unpadded);
+        //Log.v(TAG, "Unpadded (this is backwards): " + unpadded);
 
         //Assign each array value true or false based on the value of each character
         //1 = true and 0 = false
@@ -40,7 +40,7 @@ public class RpiPinReader {
         }
 
         //Done
-        Log.v(TAG, Arrays.toString(result));
+        //Log.v(TAG, Arrays.toString(result));
         return result;
     }
 }

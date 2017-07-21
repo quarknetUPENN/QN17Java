@@ -29,6 +29,7 @@ public class main {
             return;
         }
 
+
         //create a new thread to handle receiving all the data and sending it to GonWriters to record
         Thread pinRecorder = new Thread(new Runnable() {
             @Override
@@ -36,6 +37,8 @@ public class main {
                 Log.v(TAG, "Pin recorder thread started");
                 //counts how many events have been received
                 int eventN = 1;
+
+                int readCntr = 0;
 
                 //if we are not asked to stop, keep reading data
                 while (!Thread.interrupted()) {
@@ -54,24 +57,28 @@ public class main {
                         try {
                             while (FpgaPin.EMPTY.isLow()) {
                                 //pulse the clock
-                                System.out.println(tubeCounter);
                                 FpgaPin.CLK.setHigh();
-                                Log.v(TAG, "Waiting for valid pin, valid pin is " + FpgaPin.VALID.getState());
+                                //Thread.sleep(1);
+                                boolean goodExit = false;
                                 for (int k = 0; k < 99; k++) {
-                                    if (FpgaPin.VALID.isHigh()) {
+                                    if (FpgaPin.VALID.isLow())
                                         Thread.sleep(1, 0);
-                                    }
-                                    else{
+                                    else {
+                                        goodExit = true;
                                         break;
                                     }
                                 }
-                                Log.v(TAG, "Valid pin is " + FpgaPin.VALID.getState() + ", now collecting data");
-                                Log.v(TAG, "Event write flag is " + eventWriteFlag);
+                                if(!goodExit)
+                                    Log.w(TAG,"Waited 100ms for VALID, did not see it.  Moving on");
+
+                                //Log.v(TAG, "Valid pin is " + FpgaPin.VALID.getState() + ", now collecting data");
+                                //Log.v(TAG, "Event write flag is " + eventWriteFlag);
                                 //record the data for the tube into eventTubeStates
                                 try {
                                     //read the pins, returning an encoded int.  convert to binary string and then decode it
                                     currentInput = RpiPinReader.readDecodePins();
-
+                                    readCntr++;
+                                    Log.v(TAG,readCntr+" read times");
                                     //stop if we are supposed to, otherwise, add the tube to the array
                                     if(isStopFlag(currentInput)) {
                                         break;
@@ -85,7 +92,7 @@ public class main {
                                 }
 
                                 FpgaPin.CLK.setLow();
-                                Thread.sleep(1, 1);
+                                //Thread.sleep(10);
                                 tubeCounter++;
                             }
                         } catch (InterruptedException e) {
@@ -112,6 +119,11 @@ public class main {
         });
 
 
+        try {
+            System.in.read();
+        } catch (IOException e) {
+            Log.e(TAG, "Interrupted while running, will shut down");
+        }
         //start the thread to read data, and don't end until user input
         pinRecorder.start();
         try {
