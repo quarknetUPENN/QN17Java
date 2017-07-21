@@ -3,7 +3,7 @@
 #include <jni.h>
 #include "RpiPinReader.h"
 
-JNIEXPORT jint JNICALL Java_RpiPinReader_readPins(JNIEnv *env, jclass clazz) {
+JNIEXPORT jint JNICALL Java_RpiPinReader_readPins(JNIEnv *env, jobject obj) {
  printf("it worked");
- return 1;
+ return (jint)1;
 }
