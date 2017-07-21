@@ -11,8 +11,32 @@ public class PinReadTest {
         Thread pinReadThread = new Thread(new Runnable() {
             @Override
             public void run() {
-                Log.i(TAG,""+ Arrays.toString(RpiPinReader.readDecodePins()));
-/*                while(!Thread.interrupted())
+                boolean[] result = new boolean[16];
+
+                //Calls the C function to read each pin
+                String unpadded = Integer.toBinaryString(RpiPinReader.readPins());
+
+                //Pad the leading edge of this int with zeroes until it's 16 characters long
+                while(unpadded.length() <= 15)
+                    unpadded = "0" + unpadded;
+                Log.v(TAG, "Unpadded (this is backwards): " + unpadded);
+
+                //Assign each array value true or false based on the value of each character
+                //1 = true and 0 = false
+                for (int i = unpadded.length()-1; i >= 0; i--)
+                    result[i] = (Character.getNumericValue(unpadded.charAt(i))) == 1;
+
+                //The array is backwards, so we flip it
+                for (int j = 0; j < result.length/2; j++) {
+                    boolean temp = result[j];
+                    result[j] = result[result.length - 1 - j];
+                    result[result.length - 1 - j] = temp;
+                }
+
+                //Done
+                Log.v(TAG, Arrays.toString(result));
+
+                /*                while(!Thread.interrupted())
                 {
                     main.FpgaPin.ENABLE.logState();
                     main.FpgaPin.VALID.logState();
@@ -35,6 +59,7 @@ public class PinReadTest {
                     main.FpgaPin.RAD_6.logState();
                     main.FpgaPin.RAD_7.logState();
                 }*/
+
             }
         });
 
