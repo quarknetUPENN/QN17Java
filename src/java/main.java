@@ -58,7 +58,7 @@ public class main {
                             while (FpgaPin.EMPTY.isLow()) {
                                 //pulse the clock
                                 FpgaPin.CLK.setHigh();
-                                //Thread.sleep(1);
+                                Thread.sleep(1);
                                 boolean goodExit = false;
                                 for (int k = 0; k < 99; k++) {
                                     if (FpgaPin.VALID.isLow())
@@ -92,9 +92,10 @@ public class main {
                                 }
 
                                 FpgaPin.CLK.setLow();
-                                //Thread.sleep(10);
+                                Thread.sleep(1);
                                 tubeCounter++;
                             }
+                            FpgaPin.CLK.setLow();
                         } catch (InterruptedException e) {
                             Log.e(TAG, "Reading thread interrupted while waiting; terminating read thread", e);
                             break;
