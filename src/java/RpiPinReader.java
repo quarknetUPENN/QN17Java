@@ -1,6 +1,4 @@
 import java.nio.file.Paths;
-import java.util.Arrays;
-import java.util.Collections;
 
 /**
  * Created by root on 7/20/17.
@@ -14,33 +12,28 @@ public class RpiPinReader {
         System.load(Paths.get("").toAbsolutePath().toString()+"/lib/librpipinreader.so");
     }
 
+    //A function written in native C that reads all 16 pins and returns them packed into an int
     native static int readPins();
 
+    /**
+     * Gets the current states of all the pins and decodes it into a boolean array
+     * Uses the order from RpiPinReader.c
+     *
+     * @return the state of all the 16 data pins, with true as high and false as low
+     */
     static boolean[] readDecodePins(){
         boolean[] result = new boolean[16];
 
-        //Calls the C function to read each pin
-        String unpadded = Integer.toBinaryString(RpiPinReader.readPins());
+        //Read the int, get into a binary format, and pad it in the front to 16 characters long
+        StringBuilder padded = new StringBuilder(Integer.toBinaryString(readPins()));
+        while (padded.length() <= 15)
+            padded.insert(0, "0");
 
-        //Pad the leading edge of this int with zeroes until it's 16 characters long
-        while(unpadded.length() <= 15)
-            unpadded = "0" + unpadded; //Now padded (don't let the name mislead you)
-        //Log.v(TAG, "Unpadded (this is backwards): " + unpadded);
-
-        //Assign each array value true or false based on the value of each character
+        //Assign each array value true or false based on the value of each character - in reverse so as to correct for endianness
         //1 = true and 0 = false
-        for (int i = unpadded.length()-1; i >= 0; i--)
-            result[i] = (Character.getNumericValue(unpadded.charAt(i))) == 1;
+        for (int i = 0; i <= padded.length() - 1; i++)
+            result[padded.length() - 1 - i] = (Character.getNumericValue(padded.charAt(i))) == 1;
 
-        //The array is backwards, so we flip it
-        for (int j = 0; j < result.length/2; j++) {
-            boolean temp = result[j];
-            result[j] = result[result.length - 1 - j];
-            result[result.length - 1 - j] = temp;
-        }
-
-        //Done
-        //Log.v(TAG, Arrays.toString(result));
         return result;
     }
 }

@@ -1,4 +1,3 @@
-import com.pi4j.wiringpi.GpioUtil;
 import org.apache.commons.io.FileUtils;
 
 import java.io.*;
@@ -17,108 +16,15 @@ public class main {
     public static void main(String[] args) {
         initGpio();
 
-        //initialize rd pins with the FPGA
-        FpgaPin.ENABLE.setHigh();
-        FpgaPin.CLK.setLow();
-
-
         //create the directory to store all the data from this run in
-        final File dataDir = createTimeStampedDataDir();
+        File dataDir = createTimeStampedDataDir();
         if(dataDir == null){
             Log.e(TAG,"FATAL: Could not make data directory");
             return;
         }
 
-
         //create a new thread to handle receiving all the data and sending it to GonWriters to record
-        Thread pinRecorder = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                Log.v(TAG, "Pin recorder thread started");
-                //counts how many events have been received
-                int eventN = 1;
-
-                int readCntr = 0;
-
-                //if we are not asked to stop, keep reading data
-                while (!Thread.interrupted()) {
-                    //this is filled with data from one event, ie, 32 tubes
-                    //each sublist is one tube
-                    boolean[][] eventTubeStates = new boolean[32][16];
-                    boolean eventWriteFlag = false;
-                    //a counter variable for each event.  it counts the number of tubes that have passed
-                    int tubeCounter = 0;
-                    boolean[] currentInput;
-
-                    //if there is data, go get it
-                    if (FpgaPin.EMPTY.isLow()) {
-                        //Log.v(TAG, "Going to read data");
-                        //keep reading tubes until there are no more tubes, or you run out for some reason
-                        try {
-                            while (FpgaPin.EMPTY.isLow()) {
-                                //pulse the clock
-                                FpgaPin.CLK.setHigh();
-                                Thread.sleep(1);
-                                boolean goodExit = false;
-                                for (int k = 0; k < 99; k++) {
-                                    if (FpgaPin.VALID.isLow())
-                                        Thread.sleep(1, 0);
-                                    else {
-                                        goodExit = true;
-                                        break;
-                                    }
-                                }
-                                if(!goodExit)
-                                    Log.w(TAG,"Waited 100ms for VALID, did not see it.  Moving on");
-
-                                //Log.v(TAG, "Valid pin is " + FpgaPin.VALID.getState() + ", now collecting data");
-                                //Log.v(TAG, "Event write flag is " + eventWriteFlag);
-                                //record the data for the tube into eventTubeStates
-                                try {
-                                    //read the pins, returning an encoded int.  convert to binary string and then decode it
-                                    currentInput = RpiPinReader.readDecodePins();
-                                    readCntr++;
-                                    Log.v(TAG,readCntr+" read times");
-                                    //stop if we are supposed to, otherwise, add the tube to the array
-                                    if(isStopFlag(currentInput)) {
-                                        break;
-                                    } else {
-                                        eventTubeStates[tubeCounter] = currentInput;
-                                        eventWriteFlag = true;
-                                    }
-                                } catch (ArrayIndexOutOfBoundsException e) {
-                                    Log.w(TAG, "Stop flag not encountered on 33rd data point; will move on to next file");
-                                    break;
-                                }
-
-                                FpgaPin.CLK.setLow();
-                                Thread.sleep(1);
-                                tubeCounter++;
-                            }
-                            FpgaPin.CLK.setLow();
-                        } catch (InterruptedException e) {
-                            Log.e(TAG, "Reading thread interrupted while waiting; terminating read thread", e);
-                            break;
-                        }
-                        //send the event data over to a GonWriter to have it recorded to a file
-                        if (eventWriteFlag) {
-                            new Thread(new GonWriter(new File(dataDir, "event" + Integer.toString(eventN) + ".gon"), eventTubeStates)).start();
-                            eventN++;
-                        }
-                    } else {
-                        Log.i(TAG, "No data to get");
-                        try {
-                            Thread.sleep(10);
-                        } catch(InterruptedException e){
-                            Log.i(TAG,"Interrupted while waiting for data");
-                        }
-                    }
-
-                }
-                Log.i(TAG,"Interrupt received, ending pin listener thread");
-            }
-        });
-
+        Thread pinRecorder = new Thread(new DataRecorder(dataDir));
 
         try {
             System.in.read();
@@ -135,67 +41,30 @@ public class main {
         pinRecorder.interrupt();
     }
 
+    /**
+     * Initializes the GPIO pins by initializing wiringPi
+     * Note that setup.sh still needs to be run as sudo to export the pins
+     */
     static void initGpio(){
-        //make pi4j use the new version of wiringPi on the RPi
-        //instead of the old statically linked version
-        System.setProperty("pi4j.linking", "dynamic");
-
 /*        try{
             Runtime.getRuntime().exec("sudo ./setup.sh");
         } catch (IOException e) {
             Log.e(TAG,"Could not export pins, the thing might not work",e);
         }*/
 
-        //setup wiringpi to use BCM
+        //make wiringpi use BCM pin numbering
         if (com.pi4j.wiringpi.Gpio.wiringPiSetupGpio() == -1) {
             Log.e(TAG, "FATAL: failed to set up GPIO");
             throw new RuntimeException("WiringPi failed to properly set up GPIO for some reason.  Are you running as sudo?");
-        }
-        else
+        } else
             Log.i(TAG,"Successfully set up GPIO");
+
+        //set up the outputs
+        FpgaPin.ENABLE.setHigh();
+        FpgaPin.CLK.setLow();
     }
 
-    /**
-     * Detects if the FPGA is sending a stop flag with all bits high, indicating the end of the event (all
-     * data for each tube has been sent)
-     *
-     * @return whether or not the FPGA is currently sending a stop flag
-     */
-    static boolean isStopFlag(boolean[] inputs) {
 
-        boolean isStop = true;
-        //iterate through every current pin.  if they are all high, then return true
-        for(boolean pin : inputs){
-            isStop = isStop && pin;
-        }
-        if(isStop)
-            Log.v(TAG,"Stop flag reached");
-        return isStop;
-    }
-
-    /**
-     * Checks the levels of all the data pins connected to the FPGA and returns them as booleans in a list
-     * @return a boolean list with the current input on each input pin
-     */
-    static boolean[] recordCurrentInputs(){
-        return new boolean[]{
-                FpgaPin.TUBELEVEL_0.getState(),
-                FpgaPin.TUBELEVEL_1.getState(),
-                FpgaPin.TUBELEVEL_2.getState(),
-                FpgaPin.TUBELEVEL_3.getState(),
-                FpgaPin.TUBESUBLEVEL.getState(),
-                FpgaPin.TUBENUM_0.getState(),
-                FpgaPin.TUBENUM_1.getState(),
-                FpgaPin.TUBENUM_2.getState(),
-                FpgaPin.RAD_0.getState(),
-                FpgaPin.RAD_1.getState(),
-                FpgaPin.RAD_2.getState(),
-                FpgaPin.RAD_3.getState(),
-                FpgaPin.RAD_4.getState(),
-                FpgaPin.RAD_5.getState(),
-                FpgaPin.RAD_6.getState(),
-                FpgaPin.RAD_7.getState()};
-    }
 
 
     /**
@@ -226,28 +95,28 @@ public class main {
      * pin as appropriate
      */
     enum FpgaPin {
-        ENABLE      (2,         GpioUtil.DIRECTION_OUT),
-        VALID       (8,         GpioUtil.DIRECTION_IN),
-        EMPTY       (9,         GpioUtil.DIRECTION_IN),
-        CLK         (11,        GpioUtil.DIRECTION_OUT),
+        ENABLE(2, GpioDirection.OUT),
+        VALID(8, GpioDirection.IN),
+        EMPTY(9, GpioDirection.IN),
+        CLK(11, GpioDirection.OUT),
 
-        TUBELEVEL_0 (18,        GpioUtil.DIRECTION_IN),
-        TUBELEVEL_1 (23,        GpioUtil.DIRECTION_IN),
-        TUBELEVEL_2 (24,        GpioUtil.DIRECTION_IN),
-        TUBELEVEL_3 (25,        GpioUtil.DIRECTION_IN),
-        TUBESUBLEVEL(7,         GpioUtil.DIRECTION_IN),
-        TUBENUM_0   (16,        GpioUtil.DIRECTION_IN),
-        TUBENUM_1   (20,        GpioUtil.DIRECTION_IN),
-        TUBENUM_2   (21,        GpioUtil.DIRECTION_IN),
+        TUBELEVEL_0(18, GpioDirection.IN),
+        TUBELEVEL_1(23, GpioDirection.IN),
+        TUBELEVEL_2(24, GpioDirection.IN),
+        TUBELEVEL_3(25, GpioDirection.IN),
+        TUBESUBLEVEL(7, GpioDirection.IN),
+        TUBENUM_0(16, GpioDirection.IN),
+        TUBENUM_1(20, GpioDirection.IN),
+        TUBENUM_2(21, GpioDirection.IN),
 
-        RAD_0       (26,        GpioUtil.DIRECTION_IN),
-        RAD_1       (13,        GpioUtil.DIRECTION_IN),
-        RAD_2       (5,         GpioUtil.DIRECTION_IN),
-        RAD_3       (10,        GpioUtil.DIRECTION_IN),
-        RAD_4       (4,         GpioUtil.DIRECTION_IN),
-        RAD_5       (17,        GpioUtil.DIRECTION_IN),
-        RAD_6       (27,        GpioUtil.DIRECTION_IN),
-        RAD_7       (22,        GpioUtil.DIRECTION_IN);
+        RAD_0(26, GpioDirection.IN),
+        RAD_1(13, GpioDirection.IN),
+        RAD_2(5, GpioDirection.IN),
+        RAD_3(10, GpioDirection.IN),
+        RAD_4(4, GpioDirection.IN),
+        RAD_5(17, GpioDirection.IN),
+        RAD_6(27, GpioDirection.IN),
+        RAD_7(22, GpioDirection.IN);
 
         private int pinCode;
         private int direction;
@@ -259,14 +128,16 @@ public class main {
             this.pinCode = pinCode;
             this.direction = direction;
 
-            if(direction == GpioUtil.DIRECTION_OUT){
+
+            //TODO: this is dumb, the write capacity should also depend on the RAF
+            if (direction == GpioDirection.OUT) {
                 try {
                     writer = new OutputStreamWriter(new FileOutputStream("/sys/class/gpio/gpio"+pinCode+"/value"));
                 } catch (FileNotFoundException e){
                     Log.e(TAG, "Pin "+pinCode+" not exported, try running setup.sh",e);
                 }
             }
-            if(direction == GpioUtil.DIRECTION_IN){
+            if (direction == GpioDirection.IN) {
                 try{
                     file = new RandomAccessFile("/sys/class/gpio/gpio"+pinCode+"/value","r");
                 } catch (FileNotFoundException e) {
@@ -282,7 +153,7 @@ public class main {
          * @param state the state to set the pin to; false for low, true for high
          */
         public void setState(boolean state) {
-            if(direction == GpioUtil.DIRECTION_OUT){
+            if (direction == GpioDirection.OUT) {
                 try {
                     if(state)
                         writer.write("1\n");
@@ -343,5 +214,10 @@ public class main {
         public int getDirection() {
             return direction;
         }
+    }
+
+    class GpioDirection {
+        public static final int IN = 0;
+        public static final int OUT = 1;
     }
 }
