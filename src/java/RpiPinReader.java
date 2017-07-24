@@ -1,4 +1,5 @@
 import java.nio.file.Paths;
+import java.util.Arrays;
 
 /**
  * Created by root on 7/20/17.
@@ -29,14 +30,39 @@ public class RpiPinReader {
         while (padded.length() <= 15)
             padded.insert(0, "0");
 
+        Log.v(TAG, "Encoded int is "+ readPins());
+        Log.v(TAG, "Binary conv is "+ padded.toString());
         //Assign each array value true or false based on the value of each character - in reverse so as to correct for endianness
         //1 = true and 0 = false
         for (int i = 0; i <= padded.length() - 1; i++)
             result[padded.length() - 1 - i] = (Character.getNumericValue(padded.charAt(i))) == 1;
 
+        Log.v(TAG, "Final array is "+ Arrays.toString(result));
         return result;
     }
+//     static boolean[] readDecodePins(){
+//
+//         boolean[] result = new boolean[16];
+//         String unpadded = Integer.toBinaryString(RpiPinReader.readPins());
+//
+//         while (unpadded.length() <= 15){
+//             unpadded = "0" + unpadded;
+//         }
+//
+//         for (int k = unpadded.length()-1; k >= 0; k--){
+//             result[k] = (Character.getNumericValue(unpadded.charAt(k))) == 1;
+//         }
+//
+//         for (int j = 0; j < result.length/2; j++){
+//             boolean temp = result[j];
+//             result[j] = result[result.length - 1 - j];
+//             result[result.length - 1 - j] = temp;
+//         }
+//
+//         return result;
+//     }
 }
+
 
 //compile the java file by generating .class file;
 //javac RpiPinReader.java

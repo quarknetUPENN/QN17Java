@@ -51,14 +51,15 @@ public class main {
         } catch (IOException e) {
             Log.e(TAG,"Could not export pins, the thing might not work",e);
         }*/
-
+        System.setProperty("pi4j.linking", "dynamic");
         //make wiringpi use BCM pin numbering
         if (com.pi4j.wiringpi.Gpio.wiringPiSetupGpio() == -1) {
             Log.e(TAG, "FATAL: failed to set up GPIO");
             throw new RuntimeException("WiringPi failed to properly set up GPIO for some reason.  Are you running as sudo?");
-        } else
-            Log.i(TAG,"Successfully set up GPIO");
-
+        } else {
+            Log.i(TAG, "Successfully set up GPIO");
+            Log.i(TAG, "Press enter to continue...");
+        }
         //set up the outputs
         FpgaPin.ENABLE.setHigh();
         FpgaPin.CLK.setLow();

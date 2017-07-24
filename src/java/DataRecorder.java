@@ -57,43 +57,49 @@ public class DataRecorder implements Runnable {
 
             //Read all the data for one event
             //Loop through all the tubes in one event.  note that this is event driven, not merely counting 32 tubes
-            while (true) {
-                //if empty goes high for some reason, break out
-                if (main.FpgaPin.EMPTY.isHigh()) {
-                    Log.w(TAG, "FPGA buffer emptied out in the middle of sending an event?  Moving on");
-                    break;
-                }
-
-                //send a leading edge to the FPGA, requesting data
-                main.FpgaPin.ENABLE.setHigh();
-                main.FpgaPin.CLK.setLow();
-                main.FpgaPin.CLK.setHigh();
-
-                //wait for the valid pin to go high, or for the timeout to elapse
-                //if it is interrupted while waiting, then break out
-                if (!waitToValidate(maxWait))
-                    break;
-
-                //Read the data pins all at once
-                currentInput = RpiPinReader.readDecodePins();
-                readN++;
-                Log.v(TAG, readN + " read times");
-
-                //if it's a stop flag, then stop reading.  Otherwise, add the tube to the array
-                if (isStopFlag(currentInput))
-                    break;
-                else {
-                    eventWriteFlag = true;
-                    try {
-                        eventTubeStates[tubeN] = currentInput;
-                    } catch (ArrayIndexOutOfBoundsException e) {
-                        Log.w(TAG, "Stop flag not encountered on 33rd data point; will move on to next file");
+            try {
+                while (true) {
+                    //if empty goes high for some reason, break out
+                    if (main.FpgaPin.EMPTY.isHigh()) {
+                        Log.w(TAG, "FPGA buffer emptied out in the middle of sending an event?  Moving on");
                         break;
                     }
-                }
 
-                //we've read one tube, so mark that
-                tubeN++;
+                    //send a leading edge to the FPGA, requesting data
+                    main.FpgaPin.ENABLE.setHigh();
+                    main.FpgaPin.CLK.setLow();
+                    Thread.sleep(1);
+                    main.FpgaPin.CLK.setHigh();
+                    Thread.sleep(1);
+                    //wait for the valid pin to go high, or for the timeout to elapse
+                    //if it is interrupted while waiting, then break out
+                    if (!waitToValidate(maxWait))
+                        break;
+
+                    //Read the data pins all at once
+                    currentInput = RpiPinReader.readDecodePins();
+                    readN++;
+                    Log.v(TAG, readN + " read times");
+
+                    //if it's a stop flag, then stop reading.  Otherwise, add the tube to the array
+                    if (isStopFlag(currentInput))
+                        break;
+                    else {
+                        eventWriteFlag = true;
+                        try {
+                            eventTubeStates[tubeN] = currentInput;
+                        } catch (ArrayIndexOutOfBoundsException e) {
+                            Log.w(TAG, "Stop flag not encountered on 33rd data point; will move on to next file");
+                            break;
+                        }
+                    }
+
+                    //we've read one tube, so mark that
+                    tubeN++;
+                }
+            }
+            catch (InterruptedException e) {
+                Log.e(TAG, "interrupted exception, i am sad", e);
             }
             //finished recording all data for one event
 
