@@ -6,7 +6,7 @@ public class Log {
         e(TAG,msg);
         e.printStackTrace();
     }
-    public static final boolean ENABLE = false; //Controls printing "v" statements
+    public static final boolean V_ENABLE = false; //Controls printing "v" statements
 
     public static void e(String TAG, String msg){
         System.out.println(TAG+"/e: "+msg);
@@ -21,7 +21,7 @@ public class Log {
     }
 
     public static void v(String TAG, String msg){
-        if (ENABLE){
+        if (V_ENABLE){
             System.out.println(TAG+"/v: "+msg);
         }
     }

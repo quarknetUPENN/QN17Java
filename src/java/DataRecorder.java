@@ -64,7 +64,7 @@ public class DataRecorder implements Runnable {
                         Log.w(TAG, "FPGA buffer emptied out in the middle of sending an event?  Moving on");
                         break;
                     }
-
+                    Log.v(TAG, "Empty is not high, moving on");
                     //send a leading edge to the FPGA, requesting data
                     main.FpgaPin.ENABLE.setHigh();
                     main.FpgaPin.CLK.setLow();
@@ -75,16 +75,18 @@ public class DataRecorder implements Runnable {
                     //if it is interrupted while waiting, then break out
                     if (!waitToValidate(maxWait))
                         break;
-
+                    Log.v(TAG, "Clock pulsed, moving on");
                     //Read the data pins all at once
                     currentInput = RpiPinReader.readDecodePins();
                     readN++;
                     Log.v(TAG, readN + " read times");
 
                     //if it's a stop flag, then stop reading.  Otherwise, add the tube to the array
-                    if (isStopFlag(currentInput))
+                    if (isStopFlag(currentInput)) {
                         break;
+                    }
                     else {
+                        Log.v(TAG, "No stop flag, eWF = " + eventWriteFlag);
                         eventWriteFlag = true;
                         try {
                             eventTubeStates[tubeN] = currentInput;
@@ -99,7 +101,7 @@ public class DataRecorder implements Runnable {
                 }
             }
             catch (InterruptedException e) {
-                Log.e(TAG, "interrupted exception, i am sad", e);
+                Log.e(TAG, "Interrupted exception", e);
             }
             //finished recording all data for one event
 
@@ -108,8 +110,9 @@ public class DataRecorder implements Runnable {
             if (eventWriteFlag) {
                 new Thread(new GonWriter(new File(dataDir, "event" + Integer.toString(eventN) + ".gon"), eventTubeStates)).start();
                 eventN++;
+
             } else {
-                Log.i(TAG, "No data to get, waiting 10ms");
+                Log.i(TAG, "No data to get, waiting 10ms, Event write flag is " + eventWriteFlag);
                 try {
                     Thread.sleep(10);
                 } catch (InterruptedException e) {
@@ -139,6 +142,7 @@ public class DataRecorder implements Runnable {
         }
         if (isStop)
             Log.v(TAG, "Stop flag reached");
+
         return isStop;
     }
 

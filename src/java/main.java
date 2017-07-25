@@ -57,8 +57,8 @@ public class main {
             Log.e(TAG, "FATAL: failed to set up GPIO");
             throw new RuntimeException("WiringPi failed to properly set up GPIO for some reason.  Are you running as sudo?");
         } else {
-            Log.i(TAG, "Successfully set up GPIO");
-            Log.i(TAG, "Press enter to continue...");
+            Log.i(TAG, "Successfully set up GPIO and ready to record");
+            Log.i(TAG, "Select in this box, and press enter to continue...");
         }
         //set up the outputs
         FpgaPin.ENABLE.setHigh();
