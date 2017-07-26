@@ -27,12 +27,15 @@ public class GonWriter implements Runnable {
     public void run() {
         boolean isBroken = false;
         //go through every tube in the received event array, and write them all to the specified file
+
         for(boolean[] tubeState : eventTubeStates) {
-            //attempt to append on the tube currently being read into the gon file
             String gonLine = findGonLine(tubeState);
+            //If the data contains "0A0", something went wrong.
+            //Flag this data so that it can get filtered out
             if (gonLine.substring(0, 3).equals("0A0")) {
                 isBroken = true;
             }
+
         }
 
         for(boolean[] tubeState : eventTubeStates)
@@ -40,6 +43,9 @@ public class GonWriter implements Runnable {
             //attempt to append on the tube currently being read into the gon file
             try {
                 String gonLine = findGonLine(tubeState);
+                //If the data contains "0A0", put that file in a folder called "broken"
+                //so that it's not analyzed later by the Python
+                //If it doesn't, then it's real data; write it to a regular .gon file
                 if (isBroken)
                     FileUtils.writeStringToFile(new File(targetDir, "broken/" + fileName), gonLine,(Charset) null,true);
                 else

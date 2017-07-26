@@ -1,4 +1,5 @@
 import java.io.File;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * A Runnable designed to run on a seperate thread that gets data from the RPi pins and records it
@@ -107,12 +108,15 @@ public class DataRecorder implements Runnable {
 
             //if something we want to record happened, then send the data to a GonWriter in a different thread to record
             //otherwise, wait a little and then check for data again
+            boolean random = (ThreadLocalRandom.current().nextInt(0, 5) == 1);
             if (eventWriteFlag) {
                 new Thread(new GonWriter(dataDir, "event" + Integer.toString(eventN) + ".gon", eventTubeStates)).start();
                 eventN++;
-
+                Log.i(TAG, "Fetching that sweet, sweet data...");
+                if(random)
+                    Log.i(TAG, "mmmm, data");
             } else {
-                Log.i(TAG, "No data to get, waiting 10ms, Event write flag is " + eventWriteFlag);
+               // Log.i(TAG, "No data to get, waiting 10ms, Event write flag is " + eventWriteFlag);
                 try {
                     Thread.sleep(10);
                 } catch (InterruptedException e) {
