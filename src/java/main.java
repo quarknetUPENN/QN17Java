@@ -87,6 +87,10 @@ public class main {
             Log.e(TAG, "Failed to create data directory, returning null.  Invalid dir name?", e);
             return null;
         }
+        File broken = new File(dataDir, "broken");
+        if (!broken.mkdirs()){
+            throw new RuntimeException("Failed to make broken data directory");
+        }
         return dataDir;
     }
 

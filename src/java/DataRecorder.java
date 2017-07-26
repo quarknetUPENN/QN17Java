@@ -108,7 +108,7 @@ public class DataRecorder implements Runnable {
             //if something we want to record happened, then send the data to a GonWriter in a different thread to record
             //otherwise, wait a little and then check for data again
             if (eventWriteFlag) {
-                new Thread(new GonWriter(new File(dataDir, "event" + Integer.toString(eventN) + ".gon"), eventTubeStates)).start();
+                new Thread(new GonWriter(dataDir, "event" + Integer.toString(eventN) + ".gon", eventTubeStates)).start();
                 eventN++;
 
             } else {

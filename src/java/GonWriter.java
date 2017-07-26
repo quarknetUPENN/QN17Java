@@ -14,23 +14,38 @@ import java.util.Arrays;
 public class GonWriter implements Runnable {
     final static String TAG = GonWriter.class.getSimpleName();
     private boolean[][] eventTubeStates;
-    private File targetWriteFile;
+    private File targetDir;
+    private String fileName;
 
-    GonWriter(File targetWriteFile, boolean[][] eventTubeStates){
-        this.targetWriteFile = targetWriteFile;
+    GonWriter(File targetDir, String fileName, boolean[][] eventTubeStates){
+        this.targetDir = targetDir;
+        this.fileName = fileName;
         this.eventTubeStates = eventTubeStates;
     }
 
     @Override
     public void run() {
+        boolean isBroken = false;
         //go through every tube in the received event array, and write them all to the specified file
+        for(boolean[] tubeState : eventTubeStates) {
+            //attempt to append on the tube currently being read into the gon file
+            String gonLine = findGonLine(tubeState);
+            if (gonLine.substring(0, 3).equals("0A0")) {
+                isBroken = true;
+            }
+        }
+
         for(boolean[] tubeState : eventTubeStates)
         {
             //attempt to append on the tube currently being read into the gon file
             try {
-                FileUtils.writeStringToFile(targetWriteFile,findGonLine(tubeState),(Charset) null,true);
+                String gonLine = findGonLine(tubeState);
+                if (isBroken)
+                    FileUtils.writeStringToFile(new File(targetDir, "broken/" + fileName), gonLine,(Charset) null,true);
+                else
+                    FileUtils.writeStringToFile(new File(targetDir, fileName),gonLine,(Charset) null,true);
             } catch (IOException e) {
-                Log.e(TAG,"Failed to write line to gon file "+targetWriteFile.getPath()+" will skip this line",e);
+                Log.e(TAG,"Failed to write line to gon file "+ targetDir.getPath()+" will skip this line",e);
             }
         }
     }
@@ -50,6 +65,7 @@ public class GonWriter implements Runnable {
         gonLine += "\n";
         return gonLine;
     }
+
 
     /**
      * Interprets the input as a binary number and returns it as an int
